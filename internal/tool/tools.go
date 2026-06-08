@@ -1,0 +1,257 @@
+package tool
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+)
+
+var ErrUnknownTool = errors.New("unknown tool")
+
+type Tool interface {
+	Name() string
+	Description() string
+	Schema() json.RawMessage
+	Execute(ctx context.Context, params json.RawMessage) (string, error)
+}
+
+type Registry struct {
+	mu    sync.RWMutex
+	tools map[string]Tool
+}
+
+func NewRegistry() *Registry {
+	return &Registry{tools: make(map[string]Tool)}
+}
+
+func (r *Registry) Register(t Tool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tools[t.Name()] = t
+}
+
+func (r *Registry) Get(name string) (Tool, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	t, ok := r.tools[name]
+	return t, ok
+}
+
+func (r *Registry) List() []Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]Tool, 0, len(r.tools))
+	for _, t := range r.tools {
+		out = append(out, t)
+	}
+	return out
+}
+
+func (r *Registry) Definitions() []interface{} {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]interface{}, 0, len(r.tools))
+	for _, t := range r.tools {
+		var schema interface{}
+		if err := json.Unmarshal(t.Schema(), &schema); err != nil {
+			continue
+		}
+		out = append(out, map[string]interface{}{
+			"type": "function",
+			"function": map[string]interface{}{
+				"name":        t.Name(),
+				"description": t.Description(),
+				"parameters":  schema,
+			},
+		})
+	}
+	return out
+}
+
+type PermissionRule struct {
+	ToolPattern string `json:"tool_pattern"`
+	Effect      string `json:"effect"`
+}
+
+type PermissionEvaluator struct {
+	rules []PermissionRule
+}
+
+func NewPermissionEvaluator() *PermissionEvaluator {
+	return &PermissionEvaluator{}
+}
+
+func (p *PermissionEvaluator) AddRule(r PermissionRule) {
+	p.rules = append(p.rules, r)
+}
+
+func (p *PermissionEvaluator) Evaluate(toolName string) string {
+	for _, r := range p.rules {
+		if r.ToolPattern == toolName {
+			return r.Effect
+		}
+	}
+	return "allow"
+}
+
+func (p *PermissionEvaluator) CanExecute(toolName string) bool {
+	return p.Evaluate(toolName) != "deny"
+}
+
+type registeredTool struct {
+	name        string
+	description string
+	schema      json.RawMessage
+	run         func(ctx context.Context, params json.RawMessage) (string, error)
+}
+
+func (t *registeredTool) Name() string                        { return t.name }
+func (t *registeredTool) Description() string                 { return t.description }
+func (t *registeredTool) Schema() json.RawMessage              { return t.schema }
+func (t *registeredTool) Execute(ctx context.Context, params json.RawMessage) (string, error) {
+	return t.run(ctx, params)
+}
+
+type toolParams struct {
+	Command string `json:"command"`
+	Timeout int    `json:"timeout"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Pattern string `json:"pattern"`
+	URL     string `json:"url"`
+}
+
+func sk(n, d string, s json.RawMessage, fn func(ctx context.Context, p json.RawMessage) (string, error)) Tool {
+	return &registeredTool{name: n, description: d, schema: s, run: fn}
+}
+
+func RegisterAll(r *Registry) {
+	registerShell(r)
+	registerFile(r)
+	registerSearch(r)
+	registerWebFetch(r)
+	registerAskUser(r)
+}
+
+func registerShell(r *Registry) {
+	r.Register(sk("run_command", "Execute a shell command and return its output",
+		json.RawMessage(`{"type":"object","properties":{"command":{"type":"string"},"timeout":{"type":"integer","default":30}},"required":["command"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			if p.Timeout <= 0 { p.Timeout = 30 }
+			cmdCtx, cancel := context.WithTimeout(ctx, time.Duration(p.Timeout)*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(cmdCtx, "bash", "-c", p.Command)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Sprintf("exit: %v\n%s", err, string(out)), nil
+			}
+			return strings.TrimSpace(string(out)), nil
+		},
+	))
+}
+
+func registerFile(r *Registry) {
+	r.Register(sk("read_file", "Read the contents of a file",
+		json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			data, err := os.ReadFile(p.Path)
+			if err != nil {
+				return "", err
+			}
+			return string(data), nil
+		},
+	))
+
+	r.Register(sk("write_file", "Write content to a file",
+		json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			os.MkdirAll(filepath.Dir(p.Path), 0755)
+			if err := os.WriteFile(p.Path, []byte(p.Content), 0644); err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("wrote %d bytes to %s", len(p.Content), p.Path), nil
+		},
+	))
+}
+
+func registerSearch(r *Registry) {
+	r.Register(sk("search_code", "Search for text patterns in the codebase",
+		json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string","default":"."}},"required":["pattern"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			if p.Path == "" { p.Path = "." }
+			cmd := exec.CommandContext(ctx, "grep", "-rn", p.Pattern, p.Path)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				if len(out) > 0 { return string(out), nil }
+				return "no matches found", nil
+			}
+			return strings.TrimSpace(string(out)), nil
+		},
+	))
+
+	r.Register(sk("glob_files", "Find files matching a glob pattern",
+		json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string","default":"."}},"required":["pattern"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			if p.Path == "" { p.Path = "." }
+			matches, _ := filepath.Glob(filepath.Join(p.Path, p.Pattern))
+			if len(matches) == 0 { return "no files matched", nil }
+			return strings.Join(matches, "\n"), nil
+		},
+	))
+}
+
+func registerWebFetch(r *Registry) {
+	r.Register(sk("web_fetch", "Fetch a URL and return its content as text",
+		json.RawMessage(`{"type":"object","properties":{"url":{"type":"string"},"timeout":{"type":"integer","default":15}},"required":["url"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p toolParams
+			json.Unmarshal(raw, &p)
+			if p.Timeout <= 0 { p.Timeout = 15 }
+			reqCtx, cancel := context.WithTimeout(ctx, time.Duration(p.Timeout)*time.Second)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(reqCtx, "GET", p.URL, nil)
+			req.Header.Set("User-Agent", "RouterForge/1.0")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return "", err
+			}
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+			return fmt.Sprintf("HTTP %d\n\n%s", resp.StatusCode, string(body)), nil
+		},
+	))
+}
+
+func registerAskUser(r *Registry) {
+	r.Register(sk("ask_user", "Ask the user a question for input",
+		json.RawMessage(`{"type":"object","properties":{"question":{"type":"string"}},"required":["question"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var q struct{ Question string `json:"question"` }
+			json.Unmarshal(raw, &q)
+			fmt.Print("\n🤔 " + q.Question + " [y/N]: ")
+			var answer string
+			fmt.Scanln(&answer)
+			if answer == "" { answer = "no" }
+			return "User response: " + answer, nil
+		},
+	))
+}

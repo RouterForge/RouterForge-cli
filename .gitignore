@@ -1,0 +1,20 @@
+# Binaries
+routerforge
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
+
+# RouterForge data
+.routerforge/
