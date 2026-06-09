@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.3.0] — 2026-06-09
+
+### Added
+- **Four-Phase Development Lifecycle** (`routerforge lifecycle`): Demo → Prototype → MVP → Production phase state machine with transition rules and per-phase deliverables
+- **Governance Layer** (`routerforge gate`): Review gate manager with Architecture Review, Security Review, Testing Requirements, Documentation, and Phase Approval gates
+- **Capability Fusion Engine** (`routerforge analyze study`): Study local and remote repositories, discover capabilities, build fusion graphs and feature matrices
+- **Enhanced Browser Intelligence**: GetCookies/SetCookie/ClearCookies, ConsoleLogs capture, NewTab/SwitchTab/CloseTab multi-tab management, WaitForSelector
+- **Cost Tracking**: Per-model, per-agent, per-phase cost tracking with aggregate totals and budget limits via CostTracker
+- **Enhanced TUI Dashboard**: Lifecycle phase display, cost overview, token usage, and task board with real-time status
+- **Structured Agent Communication Protocol**: Decision, review, report, task, action_item, escalation message types with CommunicationHub routing
+- **Additional Tools**: web_search (DuckDuckGo), api_call (generic HTTP), browser_action (proxy to browser command) registered in tool registry
+- **Deployment & Observability** (`routerforge deploy`): deploy check/build/health commands, health/ready HTTP endpoints, go vet/build/git checks
+- **Updated free model list**: big-pickle, deepseek-v4-flash-free, mimo-v2.5-free, nemotron-3-super-free, nemotron-3-ultra-free (tested working)
+
+### Changed
+- `cmd/serve.go` added /health and /health/ready endpoints
+- `internal/engine/browser_engine.go` and `browser_session.go` extended with cookie, console, tab, and wait methods
+- `internal/engine/llm_client.go` wired cost callback into response parsing
+- `internal/orchestrator/head_manager.go` integrated lifecycle, cost tracker, review gates, model list
+- `internal/orchestrator/micro_agent.go` passes CostHandler through Context to LLMClient
+- `internal/tool/tools.go` added web_search, api_call, browser_action registrations
+- `internal/tui/model.go` added lifecycle, cost, token, and task board rendering
+
 ## [1.2.0] — 2026-06-09
 
 ### Added

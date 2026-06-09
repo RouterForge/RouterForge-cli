@@ -2,7 +2,7 @@
 
 **AI Software Company Operating System**
 
-RouterForge is a Go CLI tool that orchestrates multi-agent AI teams to build software projects. It implements an 8-phase operating flow with 4 core powers, turning ideas into production-ready code through autonomous agent collaboration.
+RouterForge is a Go CLI tool that orchestrates multi-agent AI teams to build software projects. It implements a 5-phase operating flow (Idle → Understand → Design → Execute → Review) within a four-phase development lifecycle (Demo → Prototype → MVP → Production), turning ideas into production-ready code through autonomous agent collaboration.
 
 [![Go Version](https://img.shields.io/badge/go-1.24.4-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -56,10 +56,13 @@ make build
 | `init` | Initialize a new RouterForge project |
 | `plan` | Interactive planning phase |
 | `build` | Execute the build pipeline |
-| `analyze` | Repository Intelligence Engine |
+| `analyze` | Repository Intelligence Engine + Capability Fusion |
 | `agent` | Spawn dynamic sub-agents |
-| `serve` | Serve generated artifacts |
+| `serve` | Serve generated artifacts (with health endpoints) |
 | `run` | Run a shell command |
+| `lifecycle` | Manage development lifecycle phases |
+| `gate` | Review and approve governance gates |
+| `deploy` | Deployment readiness checks, build, and health |
 
 ### Build Profiles
 
@@ -106,6 +109,39 @@ routerforge analyze recommend api_server auth_system
 routerforge agent spawn "code_reviewer" "Review the auth package for security issues"
 ```
 
+### Development Lifecycle
+
+```bash
+# View current lifecycle phase and review gates
+routerforge lifecycle status
+
+# Advance to the next lifecycle phase
+routerforge lifecycle advance
+```
+
+### Governance Gates
+
+```bash
+# List all gates and their approval status
+routerforge gate list
+
+# Approve a specific gate
+routerforge gate approve architecture_review
+```
+
+### Deployment
+
+```bash
+# Run deployment readiness checks
+routerforge deploy check
+
+# Build for production
+routerforge deploy build
+
+# Health check
+routerforge deploy health
+```
+
 ### Artifacts & Tracing
 
 ```bash
@@ -117,6 +153,10 @@ routerforge build --profile quick
 
 # Serve the artifact dashboard
 routerforge serve
+
+# Health check endpoints
+curl http://localhost:8080/health
+curl http://localhost:8080/health/ready
 ```
 
 ### Terminal UI
@@ -163,6 +203,12 @@ routerforge build --profile quick --tui
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 - **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle
 - **Multi-Terminal Management**: Multiple concurrent shell sessions with command history
+- **Capability Fusion Engine**: Study local and remote repositories to discover capabilities and build integration graphs
+- **Cost Tracking**: Per-model, per-agent, per-phase cost tracking with budget limits
+- **Structured Agent Communication**: Decision, review, report, task, action item, and escalation message types with routing
+- **Four-Phase Development Lifecycle**: Demo → Prototype → MVP → Production with gated transitions
+- **Governance Layer**: Architecture reviews, security reviews, testing requirements, documentation, and phase approvals
+- **Deployment & Observability**: Health check endpoints, deployment readiness checks, and production builds
 
 ## Development
 
@@ -180,7 +226,7 @@ make lint
 make fmt
 ```
 
-All packages (13) compile clean, `go vet` passes, and 28+ tests pass across 7 test packages.
+All packages compile clean, `go vet` passes, and 39+ tests pass across 11 test packages.
 
 ## Tech Stack
 
