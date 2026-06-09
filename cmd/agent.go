@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/pterm/pterm"
-	"github.com/routerforge/cli/internal/agent"
+	"github.com/routerforge/cli/internal/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -11,26 +11,26 @@ var agentCmd = &cobra.Command{
 	Short: "Agent management commands",
 }
 
-var agentListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List available agent templates",
+var agentSpawnCmd = &cobra.Command{
+	Use:   "spawn <role> <task>",
+	Short: "Spawn a dynamic sub-agent",
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.DefaultSection.Printfln("Available Agent Templates")
-		roles := agent.ListRoles()
-		if len(roles) == 0 {
-			pterm.Info.Println("No agent templates found")
+		role := args[0]
+		task := args[1]
+
+		spawner := engine.NewAgentSpawner(modelFlag)
+		agent, err := spawner.Spawn(role, task, "cli")
+		if err != nil {
+			pterm.Error.Printfln("Spawn failed: %v", err)
 			return
 		}
-		for _, role := range roles {
-			t, _ := agent.GetTemplate(role)
-			pterm.Println(" • " + role)
-			pterm.Printfln("    Tools: %v", t.Tools)
-			pterm.Printfln("    Scope: %v", t.MemoryScope)
-		}
+		pterm.Success.Printfln("Spawned agent %s (%s)", agent.Role, agent.ID)
+		pterm.Info.Println(agent.Result)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(agentCmd)
-	agentCmd.AddCommand(agentListCmd)
+	agentCmd.AddCommand(agentSpawnCmd)
 }

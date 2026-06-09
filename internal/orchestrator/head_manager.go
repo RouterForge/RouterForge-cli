@@ -30,11 +30,19 @@ type HeadManager struct {
 	mem          memory.Store
 	plan         *models.Plan
 	tracePath    string
+	tokenBudget  *TokenBudget
+	tokenTracker *TokenTracker
+	memPolicy    *MemoryPolicy
+	memEnforcer  *MemoryPolicyEnforcer
+	sandbox      *ToolSandbox
+	spawner      *engine.AgentSpawner
 }
 
 func NewHeadManager(model string) *HeadManager {
 	id := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)
+	mp := NewMemoryPolicy()
+	sp := NewSandboxPolicy()
 	return &HeadManager{
 		project: &models.Project{
 			ID:        id,
@@ -50,6 +58,12 @@ func NewHeadManager(model string) *HeadManager {
 		model:        model,
 		userProxy:    agent.NewTerminalUserProxy(),
 		bus:          event.NewBus(),
+		tokenBudget:  NewTokenBudget(100000),
+		tokenTracker: NewTokenTracker(),
+		memPolicy:    mp,
+		memEnforcer:  NewMemoryPolicyEnforcer(mp),
+		sandbox:      NewToolSandbox(sp),
+		spawner:      engine.NewAgentSpawner(model),
 	}
 }
 
@@ -197,15 +211,19 @@ func (hm *HeadManager) Design() error {
 			continue
 		}
 		for _, pa := range pt.Agents {
-			tasks := make([]TaskDef, len(pa.Tasks))
-			for i, t := range pa.Tasks {
+			agent := BuildAgentFromPlan(hm.project.Goal, hm.model, pa, tm.agent.ID)
+			agent.SystemPrompt = GenerateSystemPromptFromLLM(pa.Role, pa.Description, hm.project.Goal, pa.Tools, pa.Tasks, hm.model)
+			tasks := make([]TaskDef, len(agent.Tasks))
+			for i, t := range agent.Tasks {
 				prio := "medium"
 				if i == 0 {
 					prio = "high"
 				}
-				tasks[i] = TaskDef{Description: t, Priority: prio}
+				tasks[i] = TaskDef{Description: t.Description, Priority: prio}
 			}
-			tm.CreateMicroAgent(pa.Role, tasks, hm.model)
+			tm.AdoptPreBuiltAgent(agent, tasks)
+			hm.memPolicy.Grant(agent.ID, pa.Role, AccessWrite, fmt.Sprintf("Agent %s scope", pa.Role))
+			hm.sandbox.RegisterAgent(agent.ID)
 		}
 	}
 
@@ -300,6 +318,11 @@ func (hm *HeadManager) savePlanArtifact(p *models.Plan) {
 }
 
 func (hm *HeadManager) Plan() *models.Plan { return hm.plan }
+func (hm *HeadManager) TokenBudget() *TokenBudget { return hm.tokenBudget }
+func (hm *HeadManager) TokenTracker() *TokenTracker { return hm.tokenTracker }
+func (hm *HeadManager) MemoryPolicy() *MemoryPolicy { return hm.memPolicy }
+func (hm *HeadManager) Sandbox() *ToolSandbox { return hm.sandbox }
+func (hm *HeadManager) Spawner() *engine.AgentSpawner { return hm.spawner }
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
 

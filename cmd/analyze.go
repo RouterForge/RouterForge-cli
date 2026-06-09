@@ -245,6 +245,47 @@ var recommendCmd = &cobra.Command{
 	},
 }
 
+var callgraphCmd = &cobra.Command{
+	Use:   "callgraph <path>",
+	Short: "Build a function-level call graph from Go source",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		aa := &repo.ASTAnalyzer{}
+		cg, err := aa.BuildCallGraph(path)
+		if err != nil {
+			pterm.Error.Printfln("Call graph failed: %v", err)
+			return
+		}
+		pterm.DefaultSection.Printfln("Call Graph: %d nodes, %d edges", len(cg.Nodes), len(cg.Edges))
+		fmt.Println(cg.Markdown())
+	},
+}
+
+var archCmd = &cobra.Command{
+	Use:   "arch <path>",
+	Short: "Fingerprint architecture of a Go project",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		aa := &repo.ASTAnalyzer{}
+		profile := aa.FingerprintArchitecture(path)
+		pterm.DefaultSection.Printfln("Architecture: %s (confidence: %.0f%%)", profile.Architecture, profile.Confidence*100)
+		if len(profile.Layers) > 0 {
+			pterm.Info.Printfln("Layers: %s", strings.Join(profile.Layers, ", "))
+		}
+		if len(profile.Patterns) > 0 {
+			pterm.Info.Printfln("Patterns: %s", strings.Join(profile.Patterns, ", "))
+		}
+		if len(profile.Evidence) > 0 {
+			pterm.DefaultSection.Println("Evidence")
+			for k, v := range profile.Evidence {
+				pterm.Printfln("  • %s: %s", k, v)
+			}
+		}
+	},
+}
+
 func init() {
 	analyzeCmd.AddCommand(cloneCmd)
 	analyzeCmd.AddCommand(detectCmd)
@@ -252,6 +293,8 @@ func init() {
 	analyzeCmd.AddCommand(matrixCmd)
 	analyzeCmd.AddCommand(recommendCmd)
 	analyzeCmd.AddCommand(astCmd)
+	analyzeCmd.AddCommand(callgraphCmd)
+	analyzeCmd.AddCommand(archCmd)
 	detectCmd.Flags().BoolVar(&astFlag, "ast", false, "Use AST analysis for Go repos")
 	rootCmd.AddCommand(analyzeCmd)
 }

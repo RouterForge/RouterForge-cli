@@ -73,6 +73,29 @@ func (tm *TeamManager) CreateMicroAgent(role string, tasks []TaskDef, model stri
 	return micro, nil
 }
 
+func (tm *TeamManager) AdoptPreBuiltAgent(agent *models.Agent, tasks []TaskDef) *MicroAgent {
+	agentTasks := make([]models.Task, len(tasks))
+	for i, t := range tasks {
+		agentTasks[i] = models.Task{
+			ID:          fmt.Sprintf("%s-%s-%d", tm.agent.ID, agent.Role, i),
+			Description: t.Description,
+			Status:      models.TaskPending,
+			Priority:    t.Priority,
+			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt:   time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+	agent.ID = fmt.Sprintf("%s-%s", tm.agent.ID, agent.Role)
+	agent.ParentID = tm.agent.ID
+	agent.Tasks = agentTasks
+	agent.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	agent.UpdatedAt = agent.CreatedAt
+
+	micro := NewMicroAgent(agent, tm.context)
+	tm.microAgents[agent.ID] = micro
+	return micro
+}
+
 func (tm *TeamManager) ExecuteAll(ctx context.Context) error {
 	pterm.DefaultSection.Printfln("Team: %s executing...", tm.agent.Role)
 
