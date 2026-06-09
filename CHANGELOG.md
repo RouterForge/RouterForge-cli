@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.6.0] — 2026-06-09
+
+### Added (Capability Graph — Connected Intelligence Layer)
+
+#### Capability Graph Model (pkg/models/codebase.go)
+- **CapabilityGraph**: Graph with typed nodes and labeled edges — replaces flat capability lists
+- **CapabilityNode**: Typed nodes (route, handler, middleware, service, repository, data_model, interface, implementation, package, entrypoint, database) with traceable source locations and key-value properties
+- **CapabilityEdge**: Labeled edges (routes_to, calls, implements, depends_on, defined_in, method_of, registers, wraps, contract_for, uses) forming a connected graph
+- Graph query methods: `NodesByType`, `EdgesFrom`, `EdgesTo`, `NodeByID`
+
+#### Deep Code Understanding (internal/repo/capability_builder.go)
+- **Route detection**: Extracts HTTP routes from call sites matching `Handle`, `HandleFunc`, `GET`, `POST`, `PUT`, `DELETE`, `PATCH` patterns. Parses Go 1.22+ method-qualified patterns (`"GET /api/users"` → method=GET, path=/api/users)
+- **Handler extraction**: Detects `ServeHTTP` methods and functions with `(http.ResponseWriter, *http.Request)` signature
+- **Middleware detection**: Identifies middleware by name patterns and `Use()`/`With()` call arguments
+- **Service boundary detection**: Packages with "service"/"services" in path or interface contracts
+- **Repository pattern detection**: Types with 2+ CRUD methods (Create, Find, Get, Update, Delete, Save, etc.) in packages with store/repo/db paths
+- **Data model extraction**: Structs with JSON/XML/BSON/GORM/YAML tags
+- **Interface → implementation mapping**: Linked via "implements" edges
+- **Database detection**: 20+ known database drivers recognized from imports (postgres, mysql, sqlite, mongo, redis, etc.)
+
+#### Enhanced Call Site Extraction (internal/repo/unified_analyzer.go)
+- **Fixed**: Caller attribution now correctly uses function name (was using package name) — call graph grew from 538→1013 nodes
+- **Added**: String literal argument capture in call sites — enables route path extraction
+- **Added**: `argToString()` helper for AST expression → string conversion
+- **Added**: Current function tracking during AST inspection for proper call site ownership
+
+#### What the Capability Graph Answers
+- "What does this system do?" → Routes, handlers, entrypoints
+- "How does it do it?" → Middleware chains, service calls, repository access
+- "What components are responsible?" → Package ownership, interface contracts, implementation bindings
+
+#### Tests
+- 4 new capability graph tests: route/handler/middleware/repo detection, node counts, data model tags, layer edges
+- Real-world validation: RouterForge capability graph = 130 nodes, 4,243 edges
+
 ## [1.5.0] — 2026-06-09
 
 ### Added (Repository Intelligence V2 — Semantic Code Model Foundation)

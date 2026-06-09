@@ -12,13 +12,14 @@ type Location struct {
 // It is language-agnostic: adding a new language means writing a parser
 // that populates this same structure.
 type Codebase struct {
-	Root            string         `json:"root"`
-	Language        string         `json:"language"`
-	Packages        []*Package     `json:"packages"`
-	DependencyGraph *DepGraph      `json:"dependency_graph,omitempty"`
-	CallGraph       *CallGraph     `json:"call_graph,omitempty"`
-	Architecture    *ArchProfile   `json:"architecture,omitempty"`
-	Capabilities    []*Capability  `json:"capabilities,omitempty"`
+	Root            string           `json:"root"`
+	Language        string           `json:"language"`
+	Packages        []*Package       `json:"packages"`
+	DependencyGraph *DepGraph        `json:"dependency_graph,omitempty"`
+	CallGraph       *CallGraph       `json:"call_graph,omitempty"`
+	Architecture    *ArchProfile     `json:"architecture,omitempty"`
+	Capabilities    []*Capability    `json:"capabilities,omitempty"`
+	CapabilityGraph *CapabilityGraph `json:"capability_graph,omitempty"`
 }
 
 // Package represents a language package or module.
@@ -86,6 +87,7 @@ type CallSite struct {
 	Caller   string   `json:"caller"`
 	Callee   string   `json:"callee"`
 	CallExpr string   `json:"call_expr"`
+	Args     []string `json:"args,omitempty"`
 	Location Location `json:"location"`
 }
 
@@ -174,6 +176,110 @@ func (c *Codebase) Interfaces() []*Interface {
 	var result []*Interface
 	for _, pkg := range c.Packages {
 		result = append(result, pkg.Interfaces...)
+	}
+	return result
+}
+
+// --- Capability Graph ---
+
+type CapabilityNodeType string
+
+const (
+	CapRoute           CapabilityNodeType = "route"
+	CapHandler         CapabilityNodeType = "handler"
+	CapMiddleware      CapabilityNodeType = "middleware"
+	CapService         CapabilityNodeType = "service"
+	CapRepository      CapabilityNodeType = "repository"
+	CapDataModel       CapabilityNodeType = "data_model"
+	CapInterface       CapabilityNodeType = "interface"
+	CapImplementation  CapabilityNodeType = "implementation"
+	CapPackage        CapabilityNodeType = "package"
+	CapEntrypoint     CapabilityNodeType = "entrypoint"
+	CapDatabase       CapabilityNodeType = "database"
+	CapConfig         CapabilityNodeType = "configuration"
+	CapClient         CapabilityNodeType = "client"
+	CapCommand        CapabilityNodeType = "command"
+)
+
+type CapabilityGraph struct {
+	Nodes []*CapabilityNode `json:"nodes"`
+	Edges []*CapabilityEdge `json:"edges"`
+}
+
+type CapabilityNode struct {
+	ID          string            `json:"id"`
+	Type        CapabilityNodeType `json:"type"`
+	Name        string            `json:"name"`
+	Package     string            `json:"package"`
+	Description string            `json:"description"`
+	Location    Location          `json:"location"`
+	Properties  map[string]string `json:"properties,omitempty"`
+}
+
+type CapabilityEdge struct {
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Type     string `json:"type"`
+	Label    string `json:"label,omitempty"`
+}
+
+func (g *CapabilityGraph) AddNode(id string, ntype CapabilityNodeType, name, pkg, desc string, loc Location, props map[string]string) *CapabilityNode {
+	for _, n := range g.Nodes {
+		if n.ID == id {
+			return n
+		}
+	}
+	node := &CapabilityNode{
+		ID: id, Type: ntype, Name: name, Package: pkg,
+		Description: desc, Location: loc, Properties: props,
+	}
+	g.Nodes = append(g.Nodes, node)
+	return node
+}
+
+func (g *CapabilityGraph) AddEdge(src, tgt, etype, label string) {
+	g.Edges = append(g.Edges, &CapabilityEdge{
+		SourceID: src, TargetID: tgt, Type: etype, Label: label,
+	})
+}
+
+func (g *CapabilityGraph) NodeByID(id string) *CapabilityNode {
+	for _, n := range g.Nodes {
+		if n.ID == id {
+			return n
+		}
+	}
+	return nil
+}
+
+func (g *CapabilityGraph) NodesByType(ntype CapabilityNodeType) []*CapabilityNode {
+	var result []*CapabilityNode
+	for _, n := range g.Nodes {
+		if n.Type == ntype {
+			result = append(result, n)
+		}
+	}
+	return result
+}
+
+// EdgesFrom returns all edges where the given node ID is the source.
+func (g *CapabilityGraph) EdgesFrom(id string) []*CapabilityEdge {
+	var result []*CapabilityEdge
+	for _, e := range g.Edges {
+		if e.SourceID == id {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+// EdgesTo returns all edges where the given node ID is the target.
+func (g *CapabilityGraph) EdgesTo(id string) []*CapabilityEdge {
+	var result []*CapabilityEdge
+	for _, e := range g.Edges {
+		if e.TargetID == id {
+			result = append(result, e)
+		}
 	}
 	return result
 }

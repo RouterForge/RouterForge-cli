@@ -225,7 +225,8 @@ routerforge build --profile quick --tui
 - **Memory System**: In-memory store with context compression, checkpoint/restore, and scope-based access policies (read/write/admin levels with wildcard matching)
 - **Token Budget Tracking**: Per-agent, per-phase, and global token limits with automatic 90% usage warnings and hard caps
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
-- **Repository Intelligence V2**: Unified Semantic Code Model (`Codebase`) with single-pass Go parsing, dependency graph, call graph (selector + direct calls), architecture fingerprinting from code relationships (import direction, layer isolation, DIP detection), capability extraction with full source traceability, and JSON serialization
+- **Repository Intelligence V2**: Unified Semantic Code Model (`Codebase`) with single-pass Go parsing, dependency graph, call graph (selector + direct calls), architecture fingerprinting from code relationships (import direction, layer isolation, DIP detection), capability extraction with full source traceability, JSON serialization
+- **Capability Graph**: Connected graph of routes, handlers, middleware, services, repositories, data models, interfaces, implementations, packages, databases — replaces flat capability lists with typed nodes and labeled edges. Answers "what does it do?", "how?", "who is responsible?"
 - **Pipeline Profiles**: Configurable build profiles (quick, full)
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 - **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle

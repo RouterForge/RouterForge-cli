@@ -82,7 +82,11 @@ func (a *ASTAnalyzer) AnalyzeToCodebase(root string) (*models.Codebase, error) {
 	for _, cs := range allCallSites {
 		for _, pkg := range cb.Packages {
 			for _, fn := range pkg.Functions {
-				if fn.Name == cs.Caller && fn.Package == cs.Caller {
+				key := fn.Name
+				if fn.Receiver != "" {
+					key = fn.Receiver + "." + fn.Name
+				}
+				if key == cs.Caller {
 					fn.Calls = append(fn.Calls, cs)
 					break
 				}
@@ -111,6 +115,9 @@ func (a *ASTAnalyzer) AnalyzeToCodebase(root string) (*models.Codebase, error) {
 
 	// fingerprint architecture from code relationships
 	cb.Architecture = fingerprintArchitecture(cb, importEdges)
+
+	// build capability graph — routes, handlers, middleware, services, repos, models
+	cb.CapabilityGraph = BuildCapabilityGraph(cb)
 
 	return cb, nil
 }
@@ -169,9 +176,16 @@ func parseGoDir(dir, root string, a *ASTAnalyzer) (*models.Package, []*models.Ca
 				})
 			}
 
+			var currentFn string
 			ast.Inspect(f, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.FuncDecl:
+					currentFn = x.Name.Name
+					if x.Recv != nil && len(x.Recv.List) > 0 {
+						recv := typeExprToString(x.Recv.List[0].Type)
+						recv = strings.TrimPrefix(recv, "*")
+						currentFn = recv + "." + x.Name.Name
+					}
 					fn := extractFunction(x, pkgName, fset)
 					if fn != nil {
 						p.Functions = append(p.Functions, fn)
@@ -221,7 +235,10 @@ func parseGoDir(dir, root string, a *ASTAnalyzer) (*models.Package, []*models.Ca
 					}
 
 				case *ast.CallExpr:
-					cs := extractCallSite(x, pkgName, fset, fileName)
+					if currentFn == "" {
+						currentFn = pkgName
+					}
+					cs := extractCallSite(x, currentFn, pkgName, fset, fileName)
 					if cs != nil {
 						callSites = append(callSites, cs)
 					}
@@ -310,36 +327,62 @@ func extractField(field *ast.Field, pkgName string, fset *token.FileSet, fileNam
 	return f
 }
 
-func extractCallSite(x *ast.CallExpr, pkgName string, fset *token.FileSet, fileName string) *models.CallSite {
+func extractCallSite(x *ast.CallExpr, callerFn, pkgName string, fset *token.FileSet, fileName string) *models.CallSite {
+	cs := &models.CallSite{
+		Caller:   callerFn,
+		Location: models.Location{
+			File: fileName,
+			Line: fset.Position(x.Pos()).Line,
+		},
+	}
+
 	switch fun := x.Fun.(type) {
 	case *ast.SelectorExpr:
 		pkg := ""
 		if ident, ok := fun.X.(*ast.Ident); ok {
 			pkg = ident.Name
 		}
-		cs := &models.CallSite{
-			Caller:   pkgName,
-			Callee:   fun.Sel.Name,
-			CallExpr: pkg + "." + fun.Sel.Name,
-			Location: models.Location{
-				File: fileName,
-				Line: fset.Position(x.Pos()).Line,
-			},
-		}
-		return cs
+		cs.Callee = fun.Sel.Name
+		cs.CallExpr = pkg + "." + fun.Sel.Name
 	case *ast.Ident:
-		cs := &models.CallSite{
-			Caller:   pkgName,
-			Callee:   fun.Name,
-			CallExpr: fun.Name,
-			Location: models.Location{
-				File: fileName,
-				Line: fset.Position(x.Pos()).Line,
-			},
-		}
-		return cs
+		cs.Callee = fun.Name
+		cs.CallExpr = fun.Name
+	default:
+		return nil
 	}
-	return nil
+
+	for _, arg := range x.Args {
+		cs.Args = append(cs.Args, argToString(arg))
+	}
+
+	return cs
+}
+
+func argToString(expr ast.Expr) string {
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		return e.Value
+	case *ast.Ident:
+		return e.Name
+	case *ast.SelectorExpr:
+		return argToString(e.X) + "." + e.Sel.Name
+	case *ast.StarExpr:
+		return "*" + argToString(e.X)
+	case *ast.CallExpr:
+		return argToString(e.Fun) + "(...)"
+	case *ast.CompositeLit:
+		return argToString(e.Type) + "{...}"
+	case *ast.FuncLit:
+		return "func(...)"
+	case *ast.BinaryExpr:
+		return argToString(e.X) + " " + e.Op.String() + " " + argToString(e.Y)
+	case *ast.IndexExpr:
+		return argToString(e.X) + "[" + argToString(e.Index) + "]"
+	case *ast.SliceExpr:
+		return argToString(e.X) + "[...]"
+	default:
+		return fmt.Sprintf("%s", expr)
+	}
 }
 
 func typeExprToString(expr ast.Expr) string {

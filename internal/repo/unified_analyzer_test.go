@@ -613,4 +613,20 @@ func TestRealWorldAnalysis_RouterForge(t *testing.T) {
 		t.Logf("Call graph: %d nodes, %d edges",
 			len(cb.CallGraph.Nodes), len(cb.CallGraph.Edges))
 	}
+
+	// Capability graph
+	if cb.CapabilityGraph != nil {
+		t.Logf("Capability graph: %d nodes, %d edges", len(cb.CapabilityGraph.Nodes), len(cb.CapabilityGraph.Edges))
+		for _, nt := range []models.CapabilityNodeType{
+			models.CapRoute, models.CapHandler, models.CapMiddleware,
+			models.CapService, models.CapRepository, models.CapDataModel,
+			models.CapInterface, models.CapImplementation, models.CapPackage,
+			models.CapEntrypoint, models.CapDatabase,
+		} {
+			nodes := cb.CapabilityGraph.NodesByType(nt)
+			if len(nodes) > 0 {
+				t.Logf("  %s: %d", nt, len(nodes))
+			}
+		}
+	}
 }
