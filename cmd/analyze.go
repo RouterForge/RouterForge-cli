@@ -426,6 +426,38 @@ var servicemapCmd = &cobra.Command{
 	},
 }
 
+var explainCmd = &cobra.Command{
+	Use:   "explain <path>",
+	Short: "Explain a codebase — architecture, routes, flows, violations, ownership",
+	Long:  `Synthesizes everything the Semantic Model understands about a codebase into a human-readable report. No README required.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		fe := fusion.NewEngine()
+
+		spinner, _ := pterm.DefaultSpinner.Start("Analyzing codebase...")
+		report, err := fe.Explain(path)
+		if err != nil {
+			spinner.Fail("Explain failed")
+			pterm.Error.Printfln("Explain failed: %v", err)
+			return
+		}
+		spinner.Success("Analysis complete")
+
+		// print the report
+		pterm.DefaultSection.Println("Codebase Explanation")
+		fmt.Println(report.Markdown())
+
+		// save full report as JSON
+		output := filepath.Join(".", ".routerforge", "artifacts", "explain.json")
+		os.MkdirAll(filepath.Dir(output), 0755)
+		if b, err := json.MarshalIndent(report, "", "  "); err == nil {
+			os.WriteFile(output, b, 0644)
+			pterm.Info.Printfln("Full report saved to %s", output)
+		}
+	},
+}
+
 var fusionDeepCmd = &cobra.Command{
 	Use:   "deep <path>",
 	Short: "Deep study a repository with AST, call graph, and arch analysis",
@@ -521,6 +553,7 @@ func init() {
 	analyzeCmd.AddCommand(fusionCmd)
 	analyzeCmd.AddCommand(archgenCmd)
 	analyzeCmd.AddCommand(servicemapCmd)
+	analyzeCmd.AddCommand(explainCmd)
 	fusionCmd.AddCommand(fusionGraphCmd)
 	fusionCmd.AddCommand(fusionStudyCmd)
 	fusionCmd.AddCommand(fusionDeepCmd)

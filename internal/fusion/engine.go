@@ -264,6 +264,17 @@ func (e *Engine) DeepStudy(path string) (*DeepStudyResult, error) {
 	return result, nil
 }
 
+// Explain produces a human-readable synthesis of a codebase — architecture,
+// routes, request flows, layer violations, and ownership — derived entirely
+// from the Semantic Model with no README required.
+func (e *Engine) Explain(path string) (*repo.ExplainReport, error) {
+	cb, err := e.DeepStudyCodebase(path)
+	if err != nil {
+		return nil, fmt.Errorf("deep study: %w", err)
+	}
+	return repo.BuildExplainReport(cb), nil
+}
+
 // DeepStudyCodebase performs a single-pass analysis that returns the complete
 // semantic Codebase model. This is the V2 entry point for Repository Intelligence.
 func (e *Engine) DeepStudyCodebase(path string) (*models.Codebase, error) {

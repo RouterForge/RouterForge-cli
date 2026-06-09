@@ -1,0 +1,1729 @@
+{
+  "name": ".",
+  "summary": "14 packages, 724 functions, 193 types, 1 routes",
+  "architecture": "flat (0% confidence, 5 layers: cmd, internal, repository, pkg, model)",
+  "stats": {
+    "packages": 14,
+    "functions": 724,
+    "types": 193,
+    "interfaces": 5,
+    "cap_graph_nodes": 137,
+    "cap_graph_edges": 4598,
+    "call_graph_nodes": 1039,
+    "call_graph_edges": 5088
+  },
+  "routes": [
+    {
+      "method": "Route",
+      "path": "msg",
+      "package": "orchestrator"
+    }
+  ],
+  "flows": [
+    {
+      "method": "Route",
+      "path": "msg",
+      "package": "orchestrator",
+      "entrypoint": "main() in main",
+      "handler": {
+        "name": "",
+        "package": "",
+        "location": {
+          "file": "",
+          "line": 0
+        }
+      }
+    }
+  ],
+  "ownership": [
+    {
+      "package": "orchestrator",
+      "path": "internal/orchestrator",
+      "routes": 1,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 16,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 17
+    },
+    {
+      "package": "storage",
+      "path": "internal/storage",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 2,
+      "data_models": 3,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 5
+    },
+    {
+      "package": "tool",
+      "path": "internal/tool",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 1,
+      "data_models": 2,
+      "interfaces": 1,
+      "entrypoints": 0,
+      "total": 4
+    },
+    {
+      "package": "main",
+      "path": ".",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 0,
+      "interfaces": 0,
+      "entrypoints": 1,
+      "total": 1
+    },
+    {
+      "package": "cmd",
+      "path": "cmd",
+      "routes": 0,
+      "handlers": 1,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 0,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 1
+    },
+    {
+      "package": "event",
+      "path": "internal/event",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 1,
+      "interfaces": 1,
+      "entrypoints": 0,
+      "total": 2
+    },
+    {
+      "package": "repo",
+      "path": "internal/repo",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 1,
+      "services": 0,
+      "repositories": 1,
+      "data_models": 21,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 23
+    },
+    {
+      "package": "tui",
+      "path": "internal/tui",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 0,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 0
+    },
+    {
+      "package": "models",
+      "path": "pkg/models",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 34,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 34
+    },
+    {
+      "package": "agent",
+      "path": "internal/agent",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 1,
+      "interfaces": 1,
+      "entrypoints": 0,
+      "total": 2
+    },
+    {
+      "package": "engine",
+      "path": "internal/engine",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 2,
+      "data_models": 8,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 10
+    },
+    {
+      "package": "fusion",
+      "path": "internal/fusion",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 4,
+      "interfaces": 0,
+      "entrypoints": 0,
+      "total": 4
+    },
+    {
+      "package": "llm",
+      "path": "internal/llm",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 8,
+      "interfaces": 1,
+      "entrypoints": 0,
+      "total": 9
+    },
+    {
+      "package": "memory",
+      "path": "internal/memory",
+      "routes": 0,
+      "handlers": 0,
+      "middleware": 0,
+      "services": 0,
+      "repositories": 0,
+      "data_models": 1,
+      "interfaces": 1,
+      "entrypoints": 0,
+      "total": 2
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "cli_entrypoint",
+      "description": "Has a main() entry point",
+      "confidence": 0.9,
+      "category": "feature",
+      "sources": [
+        {
+          "file": "main.go",
+          "line": 5
+        }
+      ],
+      "evidence": [
+        "Has a main() entry point"
+      ]
+    },
+    {
+      "name": "cli_framework",
+      "description": "Uses a CLI framework",
+      "confidence": 0.9,
+      "category": "framework",
+      "sources": [
+        {
+          "file": "main.go",
+          "line": 3
+        },
+        {
+          "file": "cmd/agent.go",
+          "line": 6
+        },
+        {
+          "file": "cmd/build.go",
+          "line": 10
+        },
+        {
+          "file": "cmd/build.go",
+          "line": 11
+        },
+        {
+          "file": "cmd/build.go",
+          "line": 12
+        },
+        {
+          "file": "cmd/build.go",
+          "line": 13
+        },
+        {
+          "file": "cmd/analyze.go",
+          "line": 11
+        },
+        {
+          "file": "cmd/analyze.go",
+          "line": 12
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 11
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 12
+        },
+        {
+          "file": "internal/orchestrator/lifecycle.go",
+          "line": 7
+        },
+        {
+          "file": "internal/orchestrator/head_manager.go",
+          "line": 17
+        },
+        {
+          "file": "internal/orchestrator/system_prompt.go",
+          "line": 8
+        },
+        {
+          "file": "internal/repo/explain.go",
+          "line": 7
+        },
+        {
+          "file": "internal/tui/program.go",
+          "line": 6
+        }
+      ],
+      "evidence": [
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework",
+        "Uses a CLI framework"
+      ]
+    },
+    {
+      "name": "http_server",
+      "description": "Uses an HTTP server framework",
+      "confidence": 0.9,
+      "category": "framework",
+      "sources": [
+        {
+          "file": "cmd/agent.go",
+          "line": 5
+        },
+        {
+          "file": "cmd/serve.go",
+          "line": 6
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 8
+        },
+        {
+          "file": "internal/llm/openai.go",
+          "line": 9
+        },
+        {
+          "file": "internal/orchestrator/head_manager.go",
+          "line": 15
+        },
+        {
+          "file": "internal/tool/tools.go",
+          "line": 9
+        },
+        {
+          "file": "internal/tool/tools.go",
+          "line": 18
+        }
+      ],
+      "evidence": [
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework",
+        "Uses an HTTP server framework"
+      ]
+    },
+    {
+      "name": "serialization",
+      "description": "Uses structured serialization",
+      "confidence": 0.9,
+      "category": "framework",
+      "sources": [
+        {
+          "file": "cmd/build.go",
+          "line": 4
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 5
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 4
+        },
+        {
+          "file": "internal/llm/openai.go",
+          "line": 6
+        },
+        {
+          "file": "internal/orchestrator/head_manager.go",
+          "line": 5
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 4
+        },
+        {
+          "file": "internal/storage/config.go",
+          "line": 4
+        },
+        {
+          "file": "internal/tool/tools.go",
+          "line": 5
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 3
+        }
+      ],
+      "evidence": [
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization",
+        "Uses structured serialization"
+      ]
+    },
+    {
+      "name": "json_models",
+      "description": "Has JSON-serializable data models",
+      "confidence": 0.9,
+      "category": "feature",
+      "sources": [
+        {
+          "file": "internal/agent/user_proxy.go",
+          "line": 71
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 13
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 20
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 29
+        },
+        {
+          "file": "internal/engine/llm_client.go",
+          "line": 43
+        },
+        {
+          "file": "internal/engine/search_engine.go",
+          "line": 11
+        },
+        {
+          "file": "internal/engine/agent_spawner.go",
+          "line": 11
+        },
+        {
+          "file": "internal/engine/browser_engine.go",
+          "line": 18
+        },
+        {
+          "file": "internal/engine/browser_engine.go",
+          "line": 118
+        },
+        {
+          "file": "internal/event/bus.go",
+          "line": 22
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 15
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 22
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 27
+        },
+        {
+          "file": "internal/fusion/engine.go",
+          "line": 33
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 17
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 24
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 33
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 39
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 50
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 56
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 66
+        },
+        {
+          "file": "internal/llm/provider.go",
+          "line": 89
+        },
+        {
+          "file": "internal/memory/store.go",
+          "line": 16
+        },
+        {
+          "file": "internal/orchestrator/governance.go",
+          "line": 19
+        },
+        {
+          "file": "internal/orchestrator/scheduler.go",
+          "line": 10
+        },
+        {
+          "file": "internal/orchestrator/communication.go",
+          "line": 24
+        },
+        {
+          "file": "internal/orchestrator/communication.go",
+          "line": 39
+        },
+        {
+          "file": "internal/orchestrator/communication.go",
+          "line": 46
+        },
+        {
+          "file": "internal/orchestrator/communication.go",
+          "line": 51
+        },
+        {
+          "file": "internal/orchestrator/cost_tracker.go",
+          "line": 10
+        },
+        {
+          "file": "internal/orchestrator/memory_policy.go",
+          "line": 24
+        },
+        {
+          "file": "internal/orchestrator/micro_agent.go",
+          "line": 164
+        },
+        {
+          "file": "internal/orchestrator/micro_agent.go",
+          "line": 173
+        },
+        {
+          "file": "internal/orchestrator/runtime.go",
+          "line": 13
+        },
+        {
+          "file": "internal/orchestrator/runtime.go",
+          "line": 31
+        },
+        {
+          "file": "internal/orchestrator/runtime.go",
+          "line": 241
+        },
+        {
+          "file": "internal/orchestrator/runtime.go",
+          "line": 257
+        },
+        {
+          "file": "internal/orchestrator/runtime.go",
+          "line": 411
+        },
+        {
+          "file": "internal/orchestrator/token_budget.go",
+          "line": 134
+        },
+        {
+          "file": "internal/repo/analyzer.go",
+          "line": 11
+        },
+        {
+          "file": "internal/repo/analyzer.go",
+          "line": 99
+        },
+        {
+          "file": "internal/repo/analyzer.go",
+          "line": 132
+        },
+        {
+          "file": "internal/repo/analyzer.go",
+          "line": 138
+        },
+        {
+          "file": "internal/repo/analyzer.go",
+          "line": 150
+        },
+        {
+          "file": "internal/repo/arch_fingerprint.go",
+          "line": 12
+        },
+        {
+          "file": "internal/repo/explain.go",
+          "line": 12
+        },
+        {
+          "file": "internal/repo/explain.go",
+          "line": 24
+        },
+        {
+          "file": "internal/repo/explain.go",
+          "line": 35
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 16
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 25
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 33
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 40
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 46
+        },
+        {
+          "file": "internal/repo/ast_analyzer.go",
+          "line": 52
+        },
+        {
+          "file": "internal/repo/diagram.go",
+          "line": 11
+        },
+        {
+          "file": "internal/repo/diagram.go",
+          "line": 15
+        },
+        {
+          "file": "internal/repo/diagram.go",
+          "line": 103
+        },
+        {
+          "file": "internal/repo/callgraph.go",
+          "line": 13
+        },
+        {
+          "file": "internal/repo/callgraph.go",
+          "line": 21
+        },
+        {
+          "file": "internal/repo/callgraph.go",
+          "line": 26
+        },
+        {
+          "file": "internal/storage/config.go",
+          "line": 10
+        },
+        {
+          "file": "internal/storage/config.go",
+          "line": 16
+        },
+        {
+          "file": "internal/storage/config.go",
+          "line": 22
+        },
+        {
+          "file": "internal/tool/tools.go",
+          "line": 83
+        },
+        {
+          "file": "internal/tool/tools.go",
+          "line": 127
+        },
+        {
+          "file": "pkg/models/phase.go",
+          "line": 32
+        },
+        {
+          "file": "pkg/models/phase.go",
+          "line": 63
+        },
+        {
+          "file": "pkg/models/plan.go",
+          "line": 5
+        },
+        {
+          "file": "pkg/models/plan.go",
+          "line": 14
+        },
+        {
+          "file": "pkg/models/plan.go",
+          "line": 20
+        },
+        {
+          "file": "pkg/models/plan.go",
+          "line": 28
+        },
+        {
+          "file": "pkg/models/plan.go",
+          "line": 41
+        },
+        {
+          "file": "pkg/models/project.go",
+          "line": 3
+        },
+        {
+          "file": "pkg/models/task.go",
+          "line": 13
+        },
+        {
+          "file": "pkg/models/task.go",
+          "line": 26
+        },
+        {
+          "file": "pkg/models/task.go",
+          "line": 34
+        },
+        {
+          "file": "pkg/models/agent.go",
+          "line": 22
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 6
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 14
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 29
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 41
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 48
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 59
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 68
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 80
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 89
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 98
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 105
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 111
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 117
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 126
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 137
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 207
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 212
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 222
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 293
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 301
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 317
+        },
+        {
+          "file": "pkg/models/codebase.go",
+          "line": 329
+        }
+      ],
+      "evidence": [
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models",
+        "Has JSON-serializable data models"
+      ]
+    },
+    {
+      "name": "has_tests",
+      "description": "Contains test functions",
+      "confidence": 0.9,
+      "category": "feature",
+      "sources": [
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 10
+        },
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 30
+        },
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 46
+        },
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 63
+        },
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 80
+        },
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 94
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 8
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 53
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 71
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 84
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 96
+        },
+        {
+          "file": "internal/engine/browser_engine_test.go",
+          "line": 108
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 8
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 28
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 49
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 71
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 93
+        },
+        {
+          "file": "internal/fusion/engine_test.go",
+          "line": 10
+        },
+        {
+          "file": "internal/fusion/engine_test.go",
+          "line": 41
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 35
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 48
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 62
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 70
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 88
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 108
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 116
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 127
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 7
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 15
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 33
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 45
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 59
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 71
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 80
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 95
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 14
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 27
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 35
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 43
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 51
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 68
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 76
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 113
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 143
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 163
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 9
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 46
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 66
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 78
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 99
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 113
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 131
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 145
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 163
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 178
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 194
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 207
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 229
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 241
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 253
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 277
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 295
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 308
+        },
+        {
+          "file": "internal/orchestrator/runtime_test.go",
+          "line": 318
+        },
+        {
+          "file": "internal/orchestrator/state_machine_test.go",
+          "line": 7
+        },
+        {
+          "file": "internal/orchestrator/state_machine_test.go",
+          "line": 14
+        },
+        {
+          "file": "internal/orchestrator/state_machine_test.go",
+          "line": 41
+        },
+        {
+          "file": "internal/orchestrator/state_machine_test.go",
+          "line": 62
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 9
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 20
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 31
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 42
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 62
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 79
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 87
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 105
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 118
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 140
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 151
+        },
+        {
+          "file": "internal/repo/capability_builder_test.go",
+          "line": 11
+        },
+        {
+          "file": "internal/repo/capability_builder_test.go",
+          "line": 226
+        },
+        {
+          "file": "internal/repo/capability_builder_test.go",
+          "line": 281
+        },
+        {
+          "file": "internal/repo/capability_builder_test.go",
+          "line": 331
+        },
+        {
+          "file": "internal/repo/deep_understanding_test.go",
+          "line": 15
+        },
+        {
+          "file": "internal/repo/deep_understanding_test.go",
+          "line": 485
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 12
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 166
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 243
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 301
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 371
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 411
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 434
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 483
+        },
+        {
+          "file": "internal/repo/unified_analyzer_test.go",
+          "line": 559
+        },
+        {
+          "file": "internal/storage/storage_test.go",
+          "line": 9
+        },
+        {
+          "file": "internal/storage/storage_test.go",
+          "line": 29
+        },
+        {
+          "file": "internal/storage/storage_test.go",
+          "line": 39
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 9
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 23
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 30
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 45
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 58
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 65
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 76
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 85
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 102
+        },
+        {
+          "file": "pkg/models/models_test.go",
+          "line": 7
+        },
+        {
+          "file": "pkg/models/models_test.go",
+          "line": 25
+        },
+        {
+          "file": "pkg/models/models_test.go",
+          "line": 37
+        }
+      ],
+      "evidence": [
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions",
+        "Contains test functions"
+      ]
+    },
+    {
+      "name": "testing_framework",
+      "description": "Uses testing/mocking libraries",
+      "confidence": 0.9,
+      "category": "framework",
+      "sources": [
+        {
+          "file": "internal/engine/engine_test.go",
+          "line": 7
+        },
+        {
+          "file": "internal/event/bus_test.go",
+          "line": 5
+        },
+        {
+          "file": "internal/fusion/engine_test.go",
+          "line": 7
+        },
+        {
+          "file": "internal/llm/provider_test.go",
+          "line": 5
+        },
+        {
+          "file": "internal/memory/store_test.go",
+          "line": 4
+        },
+        {
+          "file": "internal/orchestrator/orchestrator_test.go",
+          "line": 7
+        },
+        {
+          "file": "internal/repo/analyzer_test.go",
+          "line": 6
+        },
+        {
+          "file": "internal/storage/storage_test.go",
+          "line": 6
+        },
+        {
+          "file": "internal/tool/tools_test.go",
+          "line": 6
+        },
+        {
+          "file": "pkg/models/models_test.go",
+          "line": 4
+        }
+      ],
+      "evidence": [
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries",
+        "Uses testing/mocking libraries"
+      ]
+    },
+    {
+      "name": "database",
+      "description": "Uses a database driver or ORM",
+      "confidence": 0.9,
+      "category": "framework",
+      "sources": [
+        {
+          "file": "internal/orchestrator/head_manager.go",
+          "line": 14
+        },
+        {
+          "file": "internal/orchestrator/head_manager.go",
+          "line": 16
+        },
+        {
+          "file": "internal/tui/model.go",
+          "line": 10
+        },
+        {
+          "file": "internal/tui/program.go",
+          "line": 5
+        }
+      ],
+      "evidence": [
+        "Uses a database driver or ORM",
+        "Uses a database driver or ORM",
+        "Uses a database driver or ORM",
+        "Uses a database driver or ORM"
+      ]
+    },
+    {
+      "name": "request_handler",
+      "description": "Defines request handler functions",
+      "confidence": 0.9,
+      "category": "pattern",
+      "sources": [
+        {
+          "file": "internal/repo/flow_extractor.go",
+          "line": 103
+        },
+        {
+          "file": "internal/repo/flow_extractor.go",
+          "line": 113
+        },
+        {
+          "file": "internal/repo/flow_extractor.go",
+          "line": 124
+        },
+        {
+          "file": "internal/repo/capability_builder.go",
+          "line": 84
+        },
+        {
+          "file": "internal/repo/capability_builder.go",
+          "line": 385
+        }
+      ],
+      "evidence": [
+        "Defines request handler functions",
+        "Defines request handler functions",
+        "Defines request handler functions",
+        "Defines request handler functions",
+        "Defines request handler functions"
+      ]
+    },
+    {
+      "name": "middleware",
+      "description": "Defines HTTP middleware",
+      "confidence": 0.9,
+      "category": "pattern",
+      "sources": [
+        {
+          "file": "internal/repo/capability_builder.go",
+          "line": 122
+        }
+      ],
+      "evidence": [
+        "Defines HTTP middleware"
+      ]
+    },
+    {
+      "name": "authentication",
+      "description": "Uses authentication/authorization",
+      "confidence": 0.9,
+      "category": "feature",
+      "sources": [
+        {
+          "file": "internal/repo/arch_fingerprint.go",
+          "line": 6
+        },
+        {
+          "file": "internal/storage/secret_store.go",
+          "line": 4
+        },
+        {
+          "file": "internal/storage/secret_store.go",
+          "line": 5
+        },
+        {
+          "file": "internal/storage/secret_store.go",
+          "line": 6
+        }
+      ],
+      "evidence": [
+        "Uses authentication/authorization",
+        "Uses authentication/authorization",
+        "Uses authentication/authorization",
+        "Uses authentication/authorization"
+      ]
+    },
+    {
+      "name": "build_system",
+      "description": "Make-based build system",
+      "confidence": 0.6,
+      "category": "surface",
+      "sources": [
+        {
+          "file": ".",
+          "line": 1
+        }
+      ],
+      "evidence": [
+        "Make-based build system"
+      ]
+    },
+    {
+      "name": "cli_entrypoint",
+      "description": "Has CLI entrypoint in cmd/",
+      "confidence": 0.6,
+      "category": "surface",
+      "sources": [
+        {
+          "file": ".",
+          "line": 1
+        }
+      ],
+      "evidence": [
+        "Has CLI entrypoint in cmd/"
+      ]
+    },
+    {
+      "name": "go_module",
+      "description": "Go module with dependency management",
+      "confidence": 0.6,
+      "category": "surface",
+      "sources": [
+        {
+          "file": ".",
+          "line": 1
+        }
+      ],
+      "evidence": [
+        "Go module with dependency management"
+      ]
+    },
+    {
+      "name": "go_package_internal",
+      "description": "Contains internal directory — standard Go project layout",
+      "confidence": 0.6,
+      "category": "surface",
+      "sources": [
+        {
+          "file": ".",
+          "line": 1
+        }
+      ],
+      "evidence": [
+        "Contains internal directory — standard Go project layout"
+      ]
+    },
+    {
+      "name": "go_package_pkg",
+      "description": "Contains pkg directory — standard Go project layout",
+      "confidence": 0.6,
+      "category": "surface",
+      "sources": [
+        {
+          "file": ".",
+          "line": 1
+        }
+      ],
+      "evidence": [
+        "Contains pkg directory — standard Go project layout"
+      ]
+    }
+  ]
+}
