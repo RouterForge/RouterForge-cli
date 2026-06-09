@@ -80,11 +80,36 @@ routerforge analyze clone https://github.com/user/repo.git
 # Detect language and patterns
 routerforge analyze detect /path/to/repo
 
+# Full AST analysis (Go) — packages, types, interfaces, dependency graph
+routerforge analyze ast /path/to/go/repo
+
+# Detect with AST-powered capability extraction
+routerforge analyze detect --ast /path/to/go/repo
+
 # Build capability matrix
 routerforge analyze matrix
 
 # Get integration recommendations
 routerforge analyze recommend api_server auth_system
+```
+
+### Artifacts & Tracing
+
+```bash
+# Build generates traceable artifacts
+routerforge build --profile quick
+# -> .routerforge/artifacts/plan.json
+# -> .routerforge/artifacts/trace.jsonl
+# -> .routerforge/artifacts/summary.json
+
+# Serve the artifact dashboard
+routerforge serve
+```
+
+### Terminal UI
+
+```bash
+routerforge build --profile quick --tui
 ```
 
 ## Architecture

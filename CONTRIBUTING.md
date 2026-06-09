@@ -12,19 +12,19 @@ make test
 ## Project Structure
 
 ```
-cmd/           — CLI commands (cobra)
+cmd/              — CLI commands (cobra)
 internal/
-  agent/       — Agent registry, prompts, user proxy
-  engine/      — LLM client, errors, file ops, search
-  event/       — EventBus pub/sub
-  llm/         — Provider gateway + adapters
-  memory/      — In-memory store, compression
-  orchestrator/— Head Manager, state machine, micro agents
-  repo/        — Repository Intelligence Engine
-  storage/     — Config, BoltDB store, secrets
-  tool/        — Tool registry + implementations
-  tui/         — Bubbletea terminal UI
-pkg/models/    — Shared data types
+  agent/          — Agent registry, prompts, user proxy
+  engine/         — LLM client, errors, file ops, search
+  event/          — EventBus pub/sub
+  llm/            — Provider gateway + adapters
+  memory/         — In-memory store, compression
+  orchestrator/   — Head Manager, state machine, micro agents, LLM plan gen
+  repo/           — Repository Intelligence Engine (AST analysis, patterns, graphs)
+  storage/        — Config, BoltDB store, encrypted secrets
+  tool/           — Tool registry + implementations (shell, file, search, web)
+  tui/            — Bubbletea terminal UI
+pkg/models/       — Shared data types (project, agent, task, plan, trace)
 ```
 
 ## Standards
