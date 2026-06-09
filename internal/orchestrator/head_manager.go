@@ -225,8 +225,12 @@ func (hm *HeadManager) Design() error {
 			continue
 		}
 		for _, pa := range pt.Agents {
-			agent := BuildAgentFromPlan(hm.project.Goal, hm.model, pa, tm.agent.ID)
-			agent.SystemPrompt = GenerateSystemPromptFromLLM(pa.Role, pa.Description, hm.project.Goal, pa.Tools, pa.Tasks, hm.model)
+			agentModel := pa.Model
+			if agentModel == "" {
+				agentModel = hm.model
+			}
+			agent := BuildAgentFromPlan(hm.project.Goal, agentModel, pa, tm.agent.ID)
+			agent.SystemPrompt = GenerateSystemPromptFromLLM(pa.Role, pa.Description, hm.project.Goal, pa.Tools, pa.Tasks, agentModel)
 			tasks := make([]TaskDef, len(agent.Tasks))
 			for i, t := range agent.Tasks {
 				prio := "medium"
@@ -275,6 +279,14 @@ func (hm *HeadManager) designInteractive() error {
 	return nil
 }
 
+var availableModels = []string{
+	"big-pickle",
+	"deepseek-v4-flash-free",
+	"mimo-v2.5-free",
+	"nemotron-3-super-free",
+	"nemotron-3-ultra-free",
+}
+
 func (hm *HeadManager) GeneratePlan() (*models.Plan, error) {
 	prompt := fmt.Sprintf(`You are a software architecture planner. Given the following project, design the optimal team structure, agent roles, and tasks.
 
@@ -282,6 +294,15 @@ Project: %s
 Goal: %s
 Tech Stack: %s
 Description: %s
+
+Available models (pick the best fit per agent):
+- big-pickle (default, balanced)
+- deepseek-v4-flash-free (fast, good for simple/repetitive tasks)
+- mimo-v2.5-free (code generation strength)
+- nemotron-3-super-free (larger context, reasoning)
+- nemotron-3-ultra-free (highest quality, complex reasoning)
+
+For each agent you can suggest a model via "model" field. Leave empty to use the default.
 
 Return ONLY a JSON object with this structure:
 {
@@ -294,6 +315,7 @@ Return ONLY a JSON object with this structure:
         {
           "role": "agent_role_name",
           "description": "what this agent does",
+          "model": "suggested model or empty string",
           "tools": ["read","write","search","bash"],
           "tasks": ["specific task 1","specific task 2"],
           "success_criteria": ["criterion 1"]

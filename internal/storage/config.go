@@ -30,8 +30,8 @@ type Config struct {
 func DefaultConfig() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
-		Model:      "zen/big-pickle",
-		SmallModel: "zen/deepseek-v4-flash-free",
+		Model:      "big-pickle",
+		SmallModel: "deepseek-v4-flash-free",
 		ProjectDir: ".",
 		DataDir:    filepath.Join(home, ".routerforge"),
 		Pipeline: &PipelineConfig{

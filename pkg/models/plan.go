@@ -20,6 +20,7 @@ type PlanTeam struct {
 type PlanAgent struct {
 	Role            string   `json:"role"`
 	Description     string   `json:"description"`
+	Model           string   `json:"model,omitempty"`
 	Tools           []string `json:"tools"`
 	Tasks           []string `json:"tasks"`
 	SuccessCriteria []string `json:"success_criteria"`
