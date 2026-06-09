@@ -227,6 +227,9 @@ routerforge build --profile quick --tui
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
 - **Repository Intelligence V2**: Unified Semantic Code Model (`Codebase`) with single-pass Go parsing, dependency graph, call graph (selector + direct calls), architecture fingerprinting from code relationships (import direction, layer isolation, DIP detection), capability extraction with full source traceability, JSON serialization
 - **Capability Graph**: Connected graph of routes, handlers, middleware, services, repositories, data models, interfaces, implementations, packages, databases — replaces flat capability lists with typed nodes and labeled edges. Answers "what does it do?", "how?", "who is responsible?"
+- **Request Flow Tracing**: Traces every HTTP route through the system — route → handler → service → repository → data model — all derived from code analysis, no README required
+- **Layer Violation Detection**: Analyzes import direction matrices to detect layer bypass (handler→repo), DDD violations (domain→infrastructure), circular dependencies, and architectural drift
+- **Ownership Analysis**: Maps every capability back to the package that owns it — routes, handlers, middleware, services, repositories, data models per package
 - **Pipeline Profiles**: Configurable build profiles (quick, full)
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 - **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle

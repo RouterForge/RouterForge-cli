@@ -272,6 +272,18 @@ func (e *Engine) DeepStudyCodebase(path string) (*models.Codebase, error) {
 		return nil, fmt.Errorf("analyze to codebase: %w", err)
 	}
 
+	// build capability graph from semantic model
+	cb.CapabilityGraph = repo.BuildCapabilityGraph(cb)
+
+	// extract request flows (route → handler → service → repo → model)
+	cb.RequestFlows = repo.ExtractRequestFlows(cb.CapabilityGraph, cb)
+
+	// detect layer violations
+	cb.LayerViolations = repo.DetectLayerViolations(cb, cb.CapabilityGraph)
+
+	// analyze ownership distribution
+	cb.Ownership = repo.AnalyzeOwnership(cb.CapabilityGraph, cb)
+
 	// surface-level capabilities supplement the AST-derived ones
 	surfaceCaps, _ := e.StudyRepo(path)
 	for _, sc := range surfaceCaps {

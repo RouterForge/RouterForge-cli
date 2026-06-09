@@ -1,6 +1,46 @@
 # Changelog
 
-## [1.6.0] — 2026-06-09
+## [1.7.0] — 2026-06-09
+
+### Added (Deepening Go Analysis — Proven Understanding)
+
+#### Request Flow Tracing (internal/repo/flow_extractor.go)
+- **ExtractRequestFlows()**: Traces every detected HTTP route through the full system — route → handler → service → repository → data model — derived entirely from AST analysis and capability graph traversal
+- Walks call graph edges from handler function nodes, classifying callees as service/repo/model by package path
+- Maps databases to flows via package→database import detection
+- Attaches entrypoint information to every flow
+
+#### Layer Violation Detection (internal/repo/violations.go)
+- **DetectLayerViolations()**: Five architectural constraint checks:
+  - Handler→Repository bypass (skipping service layer) — severity: high
+  - Service→Infrastructure/Database import (should use repository) — severity: medium
+  - Domain→Infrastructure import (DDD violation) — severity: high
+  - Circular dependency detection via DFS cycle finding
+  - Handler→Model direct import (should use DTOs) — severity: low
+- Fixed `classifySingle()` in `arch_v2.go` to correctly handle path segment aliases (e.g., "repo" → "repository", "store", "db")
+
+#### Ownership Analysis (internal/repo/ownership.go)
+- **AnalyzeOwnership()**: Maps every capability graph node back to its owning package
+- Per-package counts: routes, handlers, middleware, services, repositories, data models, interfaces, entrypoints
+- Total capability score per package
+
+#### Semantic Model Enrichment (pkg/models/codebase.go)
+- **RequestFlow/FlowStep**: Complete trace of an HTTP request through the system
+- **LayerViolation**: Architectural constraint violation with source, target, description, severity, location
+- **OwnershipInfo**: Per-package capability ownership with typed counts
+- All three types added to the `Codebase` struct — serialized in JSON output
+
+#### Comprehensive Test Fixture (internal/repo/deep_understanding_test.go)
+- **TestDeepUnderstanding_RealisticApp**: 11 subtests verifying architecture (layered, 100% confidence), 5 routes (GET/POST/DELETE), 5 handlers, 2 middleware, 1 service, repositories, 1 data model (json tags), 5 request flows (4 with handler resolution), 0 layer violations (clean architecture), 6 owned packages with 17 total capability assignments, 24 nodes & 78 edges in capability graph
+- **TestDeepUnderstanding_WithViolations**: Deliberately creates handler→repo bypass — correctly detected as high-severity violation
+- Both tests prove the system derives trustworthy understanding without reading a README
+
+#### Fixed
+- `classifySingle()` in arch_v2.go: Now correctly maps path aliases (repo→repository, store, db) so layer import matrices work for all naming conventions
+- Violation test fixture: Fixed incorrect module name in import path
+
+### Full Test Suite
+- 55+ tests across 12 test packages — `go test ./...` and `go vet ./...` both pass clean
 
 ### Added (Capability Graph — Connected Intelligence Layer)
 

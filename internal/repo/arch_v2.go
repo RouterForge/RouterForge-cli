@@ -276,14 +276,80 @@ func buildLayerDepMatrix(layerClass map[string]bool, edges map[string]map[string
 
 func classifySingle(pkgName string, layerClass map[string]bool) string {
 	lower := strings.ToLower(pkgName)
-	for layer := range layerClass {
-		// check if pkgName or any path segment matches the layer
-		segments := pathSegments(lower)
-		for _, s := range segments {
-			if s == layer {
+	// first check for exact matches and common aliases
+	switch lower {
+	case "handler", "handlers":
+		if layerClass["handler"] || layerClass["handlers"] {
+			return "handler"
+		}
+	case "service", "services":
+		if layerClass["service"] || layerClass["services"] {
+			return "service"
+		}
+	case "repo", "repository", "repositories", "repos", "store", "stores", "db", "database":
+		if layerClass["repository"] || layerClass["repo"] || layerClass["store"] || layerClass["db"] || layerClass["database"] {
+			return "repository"
+		}
+	case "model", "models", "entity", "entities":
+		if layerClass["model"] || layerClass["models"] || layerClass["entity"] {
+			return "model"
+		}
+	case "domain":
+		return "domain"
+	case "port", "ports":
+		return "port"
+	case "adapter", "adapters":
+		return "adapter"
+	case "infrastructure", "infra":
+		return "infrastructure"
+	case "controller", "controllers":
+		return "controller"
+	case "middleware", "middlewares":
+		return "middleware"
+	case "config", "configuration":
+		return "config"
+	case "cmd":
+		return "cmd"
+	}
+	// fallback: check path segments
+	for _, seg := range pathSegments(lower) {
+		for layer := range layerClass {
+			if seg == layer {
 				return layer
 			}
 		}
+		// also check aliases
+		layer := pkgSegmentToLayer(seg)
+		if layer != "" && layerClass[layer] {
+			return layer
+		}
+	}
+	return ""
+}
+
+// pkgSegmentToLayer maps a path segment to its canonical layer class.
+func pkgSegmentToLayer(seg string) string {
+	switch seg {
+	case "handler", "handlers":
+		return "handler"
+	case "service", "services":
+		return "service"
+	case "repo", "repository", "repositories", "repos", "store", "stores", "db", "database":
+		return "repository"
+	case "model", "models", "entity", "entities":
+		return "model"
+	case "infrastructure", "infra":
+		return "infrastructure"
+	case "controller", "controllers":
+		return "controller"
+	case "middleware", "middlewares":
+		return "middleware"
+	case "config", "configuration":
+		return "config"
+	case "port", "ports":
+		return "port"
+	case "adapter", "adapters":
+		return "adapter"
 	}
 	return ""
 }

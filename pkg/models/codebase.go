@@ -20,6 +20,9 @@ type Codebase struct {
 	Architecture    *ArchProfile     `json:"architecture,omitempty"`
 	Capabilities    []*Capability    `json:"capabilities,omitempty"`
 	CapabilityGraph *CapabilityGraph `json:"capability_graph,omitempty"`
+	RequestFlows    []*RequestFlow   `json:"request_flows,omitempty"`
+	LayerViolations []*LayerViolation `json:"layer_violations,omitempty"`
+	Ownership       []*OwnershipInfo `json:"ownership,omitempty"`
 }
 
 // Package represents a language package or module.
@@ -282,4 +285,57 @@ func (g *CapabilityGraph) EdgesTo(id string) []*CapabilityEdge {
 		}
 	}
 	return result
+}
+
+// --- Request Flow ---
+
+// FlowStep represents one step in a request execution chain.
+type FlowStep struct {
+	Name     string   `json:"name"`
+	Package  string   `json:"package"`
+	Location Location `json:"location"`
+}
+
+// RequestFlow traces the complete path of an HTTP request through the system.
+// Derived entirely from code analysis — no README or documentation required.
+type RequestFlow struct {
+	Method       string     `json:"method"`
+	Path         string     `json:"path"`
+	Package      string     `json:"package"`
+	Entrypoint   string     `json:"entrypoint,omitempty"`
+	Middleware   []FlowStep `json:"middleware,omitempty"`
+	Handler      FlowStep   `json:"handler"`
+	Services     []FlowStep `json:"services,omitempty"`
+	Repositories []FlowStep `json:"repositories,omitempty"`
+	Models       []string   `json:"models,omitempty"`
+	Database     string     `json:"database,omitempty"`
+}
+
+// --- Layer Violations ---
+
+// LayerViolation describes an architectural constraint violation detected from code analysis.
+type LayerViolation struct {
+	Source      string   `json:"source"`
+	Target      string   `json:"target"`
+	Description string   `json:"description"`
+	Severity    string   `json:"severity"`
+	Location    Location `json:"location,omitempty"`
+}
+
+// --- Ownership ---
+
+// OwnershipInfo describes which capabilities are owned by each package,
+// derived entirely from capability graph analysis.
+type OwnershipInfo struct {
+	Package      string `json:"package"`
+	Path         string `json:"path"`
+	Routes       int    `json:"routes"`
+	Handlers     int    `json:"handlers"`
+	Middleware   int    `json:"middleware"`
+	Services     int    `json:"services"`
+	Repositories int    `json:"repositories"`
+	DataModels   int    `json:"data_models"`
+	Interfaces   int    `json:"interfaces"`
+	Entrypoints  int    `json:"entrypoints"`
+	Total        int    `json:"total"`
 }

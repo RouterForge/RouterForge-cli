@@ -95,6 +95,10 @@ func extractHandlers(g *models.CapabilityGraph, cb *models.Codebase) {
 				// link handler to its type
 				typeID := "type:" + pkg.Name + "." + fn.Receiver
 				g.AddEdge(id, typeID, "method_of", "method of "+fn.Receiver)
+
+				// link handler to its function node for call graph traceability
+				fnID := "fn:" + pkg.Name + "." + fn.Receiver + ".ServeHTTP"
+				g.AddEdge(id, fnID, "handles_as", "handles as "+fn.Receiver+".ServeHTTP")
 			}
 
 			// handler-like signatures: (w http.ResponseWriter, r *http.Request)
@@ -103,6 +107,13 @@ func extractHandlers(g *models.CapabilityGraph, cb *models.Codebase) {
 				g.AddNode(id, models.CapHandler,
 					fn.Name, pkg.Name,
 					"HTTP handler function: "+fn.Name, fn.Location, nil)
+
+				// link handler to its function node
+				fnID := "fn:" + pkg.Name + "." + fn.Name
+				if fn.Receiver != "" {
+					fnID = "fn:" + pkg.Name + "." + fn.Receiver + "." + fn.Name
+				}
+				g.AddEdge(id, fnID, "handles_as", "handles as "+fn.Name)
 			}
 		}
 	}
