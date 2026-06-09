@@ -38,7 +38,8 @@ type HeadManager struct {
 	memPolicy         *MemoryPolicy
 	memEnforcer       *MemoryPolicyEnforcer
 	sandbox           *ToolSandbox
-	spawner           *engine.AgentSpawner
+	spawner  *engine.AgentSpawner
+	scheduler *Scheduler
 }
 
 func NewHeadManager(model string) *HeadManager {
@@ -46,7 +47,7 @@ func NewHeadManager(model string) *HeadManager {
 	now := time.Now().UTC().Format(time.RFC3339)
 	mp := NewMemoryPolicy()
 	sp := NewSandboxPolicy()
-	return &HeadManager{
+	hm := &HeadManager{
 		project: &models.Project{
 			ID:             id,
 			Phase:          models.PhaseIdle,
@@ -71,7 +72,10 @@ func NewHeadManager(model string) *HeadManager {
 		memEnforcer:      NewMemoryPolicyEnforcer(mp),
 		sandbox:          NewToolSandbox(sp),
 		spawner:          engine.NewAgentSpawner(model),
+		scheduler:        NewScheduler(3),
 	}
+	hm.scheduler.Start()
+	return hm
 }
 
 func (hm *HeadManager) SetBus(b event.Bus) {
@@ -200,7 +204,12 @@ func (hm *HeadManager) Design() error {
 
 	plan, err := hm.GeneratePlan()
 	if err != nil {
-		pterm.Warning.Printfln("LLM plan generation failed (%v), falling back to interactive mode", err)
+		pterm.Warning.Printfln("LLM plan generation failed (%v), synthesizing from requirements...", err)
+		synthErr := hm.designSynthesized()
+		if synthErr == nil {
+			return nil
+		}
+		pterm.Warning.Printfln("Synthesis failed (%v), falling back to interactive mode", synthErr)
 		return hm.designInteractive()
 	}
 
@@ -246,9 +255,10 @@ func countAgents(p *models.Plan) int {
 func (hm *HeadManager) designInteractive() error {
 	pterm.Info.Println("Which domains does your project need?")
 	pterm.Println("  (e.g., frontend, backend, database, security, qa, devops, browser, content)")
-	input, _ := hm.userProxy.Ask("Enter comma-separated domains [backend, frontend]:")
+	pterm.Println("  Suggested from your requirements: frontend, backend")
+	input, _ := hm.userProxy.Ask("Enter comma-separated domains [auto-synthesize from requirements]:")
 	if input == "" {
-		input = "backend, frontend"
+		return hm.designSynthesized()
 	}
 	domains := strings.Split(input, ",")
 	for _, d := range domains {
@@ -326,6 +336,7 @@ func (hm *HeadManager) TokenTracker() *TokenTracker { return hm.tokenTracker }
 func (hm *HeadManager) MemoryPolicy() *MemoryPolicy { return hm.memPolicy }
 func (hm *HeadManager) Sandbox() *ToolSandbox { return hm.sandbox }
 func (hm *HeadManager) Spawner() *engine.AgentSpawner { return hm.spawner }
+func (hm *HeadManager) Scheduler() *Scheduler { return hm.scheduler }
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
 

@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/routerforge/cli/internal/repo"
 )
 
 type Capability struct {
@@ -27,8 +29,25 @@ type Connection struct {
 	Why  string `json:"why"`
 }
 
+type DeepStudyResult struct {
+	Language    string                    `json:"language"`
+	Patterns    []repo.Pattern            `json:"patterns"`
+	ASTPackages []*repo.PackageInfo       `json:"ast_packages,omitempty"`
+	DepGraph    *repo.DepGraph            `json:"dep_graph,omitempty"`
+	CallGraph   *repo.CallGraph           `json:"call_graph,omitempty"`
+	ImportGraph *repo.ImportGraph         `json:"import_graph,omitempty"`
+	ArchProfile *repo.ArchitectureProfile `json:"arch_profile,omitempty"`
+	CapGraph    *repo.CapabilityGraph     `json:"cap_graph,omitempty"`
+	FeatureMtx  *repo.FeatureMatrix       `json:"feature_matrix,omitempty"`
+	CapDiscover []Capability              `json:"cap_discover,omitempty"`
+	Summary     string                    `json:"summary"`
+}
+
 type Engine struct {
-	graph FusionGraph
+	graph     FusionGraph
+	ast       *repo.ASTAnalyzer
+	detector  *repo.PatternDetector
+	src       *repo.SourceAnalyzer
 }
 
 func NewEngine() *Engine {
@@ -37,6 +56,9 @@ func NewEngine() *Engine {
 			Capabilities: defaultCapabilities(),
 			Connections:  defaultConnections(),
 		},
+		ast:      &repo.ASTAnalyzer{},
+		detector: &repo.PatternDetector{},
+		src:      &repo.SourceAnalyzer{},
 	}
 }
 
@@ -160,6 +182,96 @@ func (e *Engine) StudyRemoteRepo(url string) ([]Capability, error) {
 	return e.StudyRepo(filepath.Join(tmpDir, name))
 }
 
+func (e *Engine) DeepStudy(path string) (*DeepStudyResult, error) {
+	result := &DeepStudyResult{}
+
+	lang := e.src.DetectLanguage(path)
+	result.Language = lang
+	result.Summary = fmt.Sprintf("Language: %s", lang)
+
+	patterns := e.detector.Detect(path)
+	result.Patterns = patterns
+
+	surfaceCaps, err := e.StudyRepo(path)
+	if err != nil {
+		surfaceCaps = nil
+	}
+	result.CapDiscover = surfaceCaps
+
+	if lang == "go" {
+		astPkgs, depGraph, astErr := e.ast.AnalyzeGoRepo(path)
+		if astErr == nil {
+			result.ASTPackages = astPkgs
+			result.DepGraph = depGraph
+
+			astPats := e.ast.DetectCapabilitiesFromAST(astPkgs)
+			for _, p := range astPats {
+				patterns = append(patterns, p)
+			}
+			result.Patterns = patterns
+
+			cgGraph := repo.NewCapabilityGraph()
+			for _, pkg := range astPkgs {
+				cgGraph.Add(pkg.Name, "AST detected package", nil)
+				for _, fn := range pkg.Functions {
+					if fn.IsExported {
+						cgGraph.Add(pkg.Name+"."+fn.Name, "Exported function", []string{pkg.Name})
+					}
+				}
+			}
+			result.CapGraph = cgGraph
+		}
+
+		callGraph, cgErr := e.ast.BuildCallGraph(path)
+		if cgErr == nil && len(callGraph.Nodes) > 0 {
+			result.CallGraph = callGraph
+		}
+
+		impGraph, igErr := e.ast.BuildImportGraph(path)
+		if igErr == nil && len(impGraph.Nodes) > 0 {
+			result.ImportGraph = impGraph
+		}
+
+		archProfile := e.ast.FingerprintArchitecture(path)
+		if archProfile != nil {
+			result.ArchProfile = archProfile
+		}
+
+		fm := repo.NewFeatureMatrix()
+		fm.AddRepo(filepath.Base(path))
+		for _, p := range patterns {
+			fm.SetFeature(filepath.Base(path), p.Name, true)
+		}
+		if astPkgs != nil {
+			for _, pkg := range astPkgs {
+				fm.SetFeature(filepath.Base(path), "pkg_"+pkg.Name, true)
+				if len(pkg.Interfaces) > 0 {
+					fm.SetFeature(filepath.Base(path), "has_interfaces", true)
+				}
+				if len(pkg.Functions) > 0 {
+					fm.SetFeature(filepath.Base(path), "has_functions", true)
+				}
+			}
+		}
+		result.FeatureMtx = fm
+
+		parts := []string{fmt.Sprintf("Language: %s", lang)}
+		parts = append(parts, fmt.Sprintf("Patterns: %d", len(patterns)))
+		if astPkgs != nil {
+			parts = append(parts, fmt.Sprintf("Packages: %d", len(astPkgs)))
+		}
+		if callGraph != nil {
+			parts = append(parts, fmt.Sprintf("Call Graph: %d nodes, %d edges", len(callGraph.Nodes), len(callGraph.Edges)))
+		}
+		if archProfile != nil {
+			parts = append(parts, fmt.Sprintf("Architecture: %s (%.0f%%)", archProfile.Architecture, archProfile.Confidence*100))
+		}
+		result.Summary = strings.Join(parts, " | ")
+	}
+
+	return result, nil
+}
+
 func (e *Engine) ToJSON() string {
 	b, _ := json.MarshalIndent(e.graph, "", "  ")
 	return string(b)
@@ -181,4 +293,81 @@ func (e *Engine) Markdown() string {
 		b.WriteString(fmt.Sprintf("| %s | %s | %s |\n", c.From, c.To, c.Why))
 	}
 	return b.String()
+}
+
+func (r *DeepStudyResult) JSON() string {
+	b, _ := json.MarshalIndent(r, "", "  ")
+	return string(b)
+}
+
+func (r *DeepStudyResult) Markdown() string {
+	var b strings.Builder
+	b.WriteString("# Deep Repository Study\n\n")
+	b.WriteString(fmt.Sprintf("**Summary:** %s\n\n", r.Summary))
+	b.WriteString(fmt.Sprintf("**Language:** %s\n\n", r.Language))
+
+	if len(r.Patterns) > 0 {
+		b.WriteString("## Patterns\n\n| Pattern | Confidence |\n|---------|----------|\n")
+		for _, p := range r.Patterns {
+			b.WriteString(fmt.Sprintf("| %s | %.0f%% |\n", p.Name, p.Confidence*100))
+		}
+		b.WriteString("\n")
+	}
+
+	if r.ArchProfile != nil {
+		b.WriteString(fmt.Sprintf("## Architecture: %s (%.0f%% confidence)\n\n", r.ArchProfile.Architecture, r.ArchProfile.Confidence*100))
+		if len(r.ArchProfile.Layers) > 0 {
+			b.WriteString(fmt.Sprintf("**Layers:** %s\n\n", strings.Join(r.ArchProfile.Layers, ", ")))
+		}
+		if len(r.ArchProfile.Patterns) > 0 {
+			b.WriteString(fmt.Sprintf("**Patterns:** %s\n\n", strings.Join(r.ArchProfile.Patterns, ", ")))
+		}
+		if len(r.ArchProfile.Evidence) > 0 {
+			b.WriteString("**Evidence:**\n")
+			for k, v := range r.ArchProfile.Evidence {
+				b.WriteString(fmt.Sprintf("- %s: %s\n", k, v))
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	if r.ImportGraph != nil && len(r.ImportGraph.Nodes) > 0 {
+		b.WriteString("## Import Graph\n\n")
+		b.WriteString(fmt.Sprintf("%d packages, %d dependencies\n\n", len(r.ImportGraph.Nodes), len(r.ImportGraph.Edges)))
+		for _, e := range r.ImportGraph.Edges {
+			b.WriteString(fmt.Sprintf("- %s → %s\n", e.Source, e.Target))
+		}
+		b.WriteString("\n")
+	}
+
+	if r.CallGraph != nil && len(r.CallGraph.Nodes) > 0 {
+		b.WriteString("## Call Graph\n\n")
+		b.WriteString(fmt.Sprintf("%d functions, %d calls\n\n", len(r.CallGraph.Nodes), len(r.CallGraph.Edges)))
+		b.WriteString("```mermaid\n")
+		b.WriteString("graph TD\n")
+		for _, e := range r.CallGraph.Edges {
+			b.WriteString(fmt.Sprintf("  %s --> %s\n", sanitizeNode(e.Caller), sanitizeNode(e.Callee)))
+		}
+		b.WriteString("```\n\n")
+	}
+
+	if len(r.ASTPackages) > 0 {
+		b.WriteString("## Packages\n\n| Package | Path | Functions | Types | Interfaces |\n|---------|------|-----------|-------|------------|\n")
+		for _, pkg := range r.ASTPackages {
+			b.WriteString(fmt.Sprintf("| %s | %s | %d | %d | %d |\n", pkg.Name, pkg.Path, len(pkg.Functions), len(pkg.Types), len(pkg.Interfaces)))
+		}
+		b.WriteString("\n")
+	}
+
+	if r.FeatureMtx != nil {
+		b.WriteString("## Feature Matrix\n\n")
+		b.WriteString(r.FeatureMtx.Markdown())
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+func sanitizeNode(name string) string {
+	return strings.NewReplacer(".", "_", "/", "_", "-", "_", " ", "_").Replace(name)
 }

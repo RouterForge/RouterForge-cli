@@ -56,7 +56,7 @@ make build
 | `init` | Initialize a new RouterForge project |
 | `plan` | Interactive planning phase |
 | `build` | Execute the build pipeline |
-| `analyze` | Repository Intelligence Engine + Capability Fusion |
+| `analyze` | Repository Intelligence Engine + Capability Fusion + Architecture Generator |
 | `agent` | Spawn dynamic sub-agents |
 | `serve` | Serve generated artifacts (with health endpoints) |
 | `run` | Run a shell command |
@@ -203,7 +203,11 @@ routerforge build --profile quick --tui
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 - **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle
 - **Multi-Terminal Management**: Multiple concurrent shell sessions with command history
-- **Capability Fusion Engine**: Study local and remote repositories to discover capabilities and build integration graphs
+- **Capability Fusion Engine v2**: Deep study with full AST analysis, call graph, import graph, architecture fingerprint, feature matrix
+- **Architecture Generator**: Auto-generate Mermaid architecture diagrams, dependency maps, call graphs, and service maps
+- **Dynamic Team Synthesis**: Requirement-driven agent generation with domain auto-detection and context-aware task derivation
+- **Concurrent Agent Scheduler**: Pooled parallel execution with configurable concurrency limits and process lifecycle management
+- **Visual Browser Testing**: Screenshot comparison, localStorage/sessionStorage access, viewport control, auto-wait after navigation
 - **Cost Tracking**: Per-model, per-agent, per-phase cost tracking with budget limits
 - **Structured Agent Communication**: Decision, review, report, task, action item, and escalation message types with routing
 - **Four-Phase Development Lifecycle**: Demo → Prototype → MVP → Production with gated transitions

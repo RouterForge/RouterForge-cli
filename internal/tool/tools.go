@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/routerforge/cli/internal/engine"
 )
 
 var ErrUnknownTool = errors.New("unknown tool")
@@ -323,10 +325,68 @@ func registerAPICall(r *Registry) {
 }
 
 func registerBrowserAction(r *Registry) {
-	r.Register(sk("browser_action", "Control a headless browser (navigate, click, type, screenshot)",
-		json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["navigate","click","type","screenshot","html"]},"value":{"type":"string"},"selector":{"type":"string","default":""}},"required":["action","value"]}`),
+	r.Register(sk("browser_action", "Control a headless browser (navigate, click, type, screenshot, html, evaluate)",
+		json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["navigate","click","type","screenshot","html","evaluate","cookies","viewport"]},"value":{"type":"string"},"selector":{"type":"string","default":""}},"required":["action","value"]}`),
 		func(ctx context.Context, raw json.RawMessage) (string, error) {
-			return "Browser action requires `routerforge browser` command. Use `routerforge browser <action> <value>` instead.", nil
+			var p struct {
+				Action   string `json:"action"`
+				Value    string `json:"value"`
+				Selector string `json:"selector"`
+			}
+			json.Unmarshal(raw, &p)
+
+			screenshotDir := filepath.Join(".", ".routerforge", "screenshots")
+			be := engine.NewBrowserEngine(screenshotDir)
+			if err := be.Launch(); err != nil {
+				return "", fmt.Errorf("browser launch failed: %w", err)
+			}
+			defer be.Close()
+
+			switch p.Action {
+			case "navigate":
+				if err := be.Navigate(p.Value); err != nil {
+					return "", fmt.Errorf("navigate: %w", err)
+				}
+				return fmt.Sprintf("Navigated to %s", p.Value), nil
+			case "click":
+				if err := be.Click(p.Selector); err != nil {
+					return "", fmt.Errorf("click: %w", err)
+				}
+				return fmt.Sprintf("Clicked %s", p.Selector), nil
+			case "type":
+				if err := be.Type(p.Selector, p.Value); err != nil {
+					return "", fmt.Errorf("type: %w", err)
+				}
+				return fmt.Sprintf("Typed '%s' into %s", p.Value, p.Selector), nil
+			case "screenshot":
+				filename, err := be.Screenshot(p.Value)
+				if err != nil {
+					return "", fmt.Errorf("screenshot: %w", err)
+				}
+				return fmt.Sprintf("Screenshot saved to %s", filename), nil
+			case "html":
+				html, err := be.HTML()
+				if err != nil {
+					return "", fmt.Errorf("html: %w", err)
+				}
+				return fmt.Sprintf("Page HTML (%d bytes):\n%s", len(html), html[:min(len(html), 5000)]), nil
+			case "evaluate":
+				result, err := be.Evaluate(p.Value)
+				if err != nil {
+					return "", fmt.Errorf("evaluate: %w", err)
+				}
+				return fmt.Sprintf("Result: %v", result), nil
+			case "cookies":
+				cookies, err := be.GetCookies()
+				if err != nil {
+					return "", fmt.Errorf("cookies: %w", err)
+				}
+				return fmt.Sprintf("Cookies (%d): %+v", len(cookies), cookies), nil
+			case "viewport":
+				return "Viewport requires SetViewport(width, height). Use browser CLI.", nil
+			default:
+				return "", fmt.Errorf("unknown browser action: %s", p.Action)
+			}
 		},
 	))
 }

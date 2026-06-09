@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.4.0] — 2026-06-09
+
+### Added (Roadmap Phase A: Repository Intelligence v2)
+- **Deep Repository Study** (`analyze fusion deep`): Full analysis pipeline — AST analysis, call graph, import graph, architecture fingerprinting, capability graph, feature matrix — wired together from the repo package into the fusion engine
+- **DeepStudyResult**: Combined result type with all analysis dimensions, JSON and Markdown output
+- **Fusion engine rewrite**: StudyRepo and DeepStudy now use `repo.ASTAnalyzer`, `repo.PatternDetector`, `repo.SourceAnalyzer` instead of shallow file-scraping
+
+### Added (Roadmap Phase B: Dynamic Team Synthesis)
+- **Team Synthesis Engine** (`internal/orchestrator/synthesis.go`): Requirement-driven agent generation — project goal, tech stack, and features are parsed to auto-select domains and generate concrete, relevant tasks
+- **Cascading design pipeline**: `Design()` now tries (1) LLM plan generation → (2) rule-based synthesis → (3) interactive fallback
+- **Requirement-aware task derivation**: `deriveFrontendTasks` and `deriveBackendTasks` generate tasks matched to project type (website vs CLI vs API)
+- **SynthesizedAgent**: Structured agent definition with domain, role, description, tools, and tasks derived from project requirements
+
+### Added (Roadmap Phase C: Browser Runtime)
+- **Visual Testing** (`ScreenshotCompare`): Compare screenshots against baseline for visual regression detection
+- **Storage Access** (`GetLocalStorage`, `GetSessionStorage`): Read browser localStorage and sessionStorage via JavaScript evaluation
+- **Auto-wait after navigation**: `Navigate()` now calls `WaitLoad()` automatically
+- **Viewport control** (`SetViewport`): Set browser viewport dimensions
+- **browser_action tool**: Now launches a real headless browser and dispatches navigate/click/type/screenshot/html/evaluate/cookies actions, instead of returning an error message
+
+### Added (Roadmap Phase D: Architecture Generator)
+- **Architecture Documentation Generator** (`analyze archgen`): Produces full Markdown architecture docs with Mermaid diagrams (dependency graph, call graph, architecture diagram) and service map table
+- **Service Map Builder** (`analyze servicemap`): Infers services from AST packages, their exports, and dependency relationships; outputs Mermaid graph
+- **ArchitectureDoc**: Complete documentation structure with all diagram types, architecture profile, and patterns
+- **ServiceMap/Service types**: Package-level service discovery with type classification (cmd/internal/pkg)
+
+### Added (Roadmap Phase E: Company Runtime)
+- **Concurrent Agent Scheduler** (`internal/orchestrator/scheduler.go`): Pooled execution of agents with configurable concurrency limit, context-based cancellation, and per-process status tracking
+- **Process lifecycle**: AgentProcess struct with running/completed/failed/cancelled states, timing, and error capture
+- **Integration**: HeadManager now initializes and starts a Scheduler (max 3 concurrent) on construction
+
 ## [1.3.0] — 2026-06-09
 
 ### Added

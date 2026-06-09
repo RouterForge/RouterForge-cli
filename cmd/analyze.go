@@ -325,6 +325,141 @@ var fusionStudyCmd = &cobra.Command{
 	},
 }
 
+var archgenCmd = &cobra.Command{
+	Use:   "archgen <path>",
+	Short: "Generate architecture documentation and diagrams",
+	Long:  `Analyze a repository and generate complete architecture documentation with Mermaid diagrams, service maps, dependency graphs, and call graphs.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		pterm.Info.Printfln("Generating architecture documentation for: %s", path)
+		spinner, _ := pterm.DefaultSpinner.Start("Analyzing repository structure...")
+
+		doc, err := repo.GenerateArchitectureDoc(path)
+		if err != nil {
+			spinner.Fail("Analysis failed")
+			pterm.Error.Printfln("Architecture doc generation failed: %v", err)
+			return
+		}
+		spinner.Success("Analysis complete")
+
+		pterm.DefaultSection.Printfln("Architecture Documentation")
+		pterm.Printfln("  Summary: %s", doc.Summary)
+
+		if doc.ArchProfile != nil {
+			pterm.DefaultSection.Printfln("Architecture Style: %s (%.0f%%)", doc.ArchProfile.Architecture, doc.ArchProfile.Confidence*100)
+			if len(doc.ArchProfile.Layers) > 0 {
+				pterm.Printfln("  Layers: %s", strings.Join(doc.ArchProfile.Layers, ", "))
+			}
+		}
+
+		if doc.ServiceMap != nil {
+			pterm.DefaultSection.Printfln("Services: %d", len(doc.ServiceMap.Services))
+			for _, s := range doc.ServiceMap.Services {
+				pterm.Printfln("  • %s (%s) — %d exports, %d dependencies", s.Name, s.Type, len(s.Exports), len(s.Dependencies))
+			}
+		}
+
+		output := filepath.Join(".", ".routerforge", "artifacts", "architecture.md")
+		os.MkdirAll(filepath.Dir(output), 0755)
+		if err := os.WriteFile(output, []byte(doc.Markdown()), 0644); err == nil {
+			pterm.Success.Printfln("Full documentation saved to %s", output)
+		}
+
+		pterm.DefaultSection.Println("Mermaid Architecture Diagram")
+		if doc.ArchMermaid != "" {
+			fmt.Println(doc.ArchMermaid)
+		}
+	},
+}
+
+var servicemapCmd = &cobra.Command{
+	Use:   "servicemap <path>",
+	Short: "Generate a service dependency map",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		pterm.Info.Printfln("Generating service map for: %s", path)
+		sm, err := repo.BuildServiceMap(path)
+		if err != nil {
+			pterm.Error.Printfln("Service map failed: %v", err)
+			return
+		}
+		pterm.DefaultSection.Printfln("Service Map: %d services", len(sm.Services))
+		for _, s := range sm.Services {
+			pterm.Printfln("  • %s (%s)", s.Name, s.Type)
+			for _, dep := range s.Dependencies {
+				pterm.Printfln("    └ depends on: %s", dep)
+			}
+		}
+		mermaid, _ := repo.GenerateServiceMap(path)
+		fmt.Println("\n" + mermaid)
+	},
+}
+
+var fusionDeepCmd = &cobra.Command{
+	Use:   "deep <path>",
+	Short: "Deep study a repository with AST, call graph, and arch analysis",
+	Long:  `Runs full analysis pipeline: language detection, pattern detection, AST analysis, call graph, import graph, architecture fingerprinting, and capability fusion.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		fe := fusion.NewEngine()
+		pterm.Info.Printfln("Deep studying: %s", path)
+		spinner, _ := pterm.DefaultSpinner.Start("Running full analysis pipeline...")
+
+		result, err := fe.DeepStudy(path)
+		if err != nil {
+			spinner.Fail("Deep study failed")
+			pterm.Error.Printfln("Deep study failed: %v", err)
+			return
+		}
+		spinner.Success("Deep study complete")
+
+		pterm.DefaultSection.Println("Deep Repository Study Results")
+		pterm.Printfln("  Summary: %s", result.Summary)
+
+		if len(result.Patterns) > 0 {
+			pterm.DefaultSection.Printfln("Patterns (%d)", len(result.Patterns))
+			for _, p := range result.Patterns {
+				pterm.Printfln("  • %s (%.0f%%)", p.Name, p.Confidence*100)
+			}
+		}
+
+		if result.ArchProfile != nil {
+			pterm.DefaultSection.Printfln("Architecture: %s (%.0f%% confidence)", result.ArchProfile.Architecture, result.ArchProfile.Confidence*100)
+			if len(result.ArchProfile.Layers) > 0 {
+				pterm.Printfln("  Layers: %s", strings.Join(result.ArchProfile.Layers, ", "))
+			}
+		}
+
+		if result.CallGraph != nil {
+			pterm.DefaultSection.Printfln("Call Graph: %d functions, %d edges", len(result.CallGraph.Nodes), len(result.CallGraph.Edges))
+		}
+
+		if result.ImportGraph != nil {
+			pterm.DefaultSection.Printfln("Import Graph: %d packages, %d dependencies", len(result.ImportGraph.Nodes), len(result.ImportGraph.Edges))
+		}
+
+		if len(result.ASTPackages) > 0 {
+			pterm.DefaultSection.Printfln("AST Packages: %d", len(result.ASTPackages))
+			for _, pkg := range result.ASTPackages {
+				pterm.Printfln("  • %s (%d funcs, %d types, %d interfaces)", pkg.Name, len(pkg.Functions), len(pkg.Types), len(pkg.Interfaces))
+			}
+		}
+
+		if result.FeatureMtx != nil {
+			pterm.DefaultSection.Println("Feature Matrix")
+			fmt.Println(result.FeatureMtx.Markdown())
+		}
+
+		if b, err := json.MarshalIndent(result, "", "  "); err == nil {
+			os.WriteFile("fusion-deep-study.json", b, 0644)
+			pterm.Info.Println("Full results saved to fusion-deep-study.json")
+		}
+	},
+}
+
 var fusionRemoteCmd = &cobra.Command{
 	Use:   "remote <url>",
 	Short: "Study a remote repository for capabilities",
@@ -355,8 +490,11 @@ func init() {
 	analyzeCmd.AddCommand(callgraphCmd)
 	analyzeCmd.AddCommand(archCmd)
 	analyzeCmd.AddCommand(fusionCmd)
+	analyzeCmd.AddCommand(archgenCmd)
+	analyzeCmd.AddCommand(servicemapCmd)
 	fusionCmd.AddCommand(fusionGraphCmd)
 	fusionCmd.AddCommand(fusionStudyCmd)
+	fusionCmd.AddCommand(fusionDeepCmd)
 	fusionCmd.AddCommand(fusionRemoteCmd)
 	detectCmd.Flags().BoolVar(&astFlag, "ast", false, "Use AST analysis for Go repos")
 	rootCmd.AddCommand(analyzeCmd)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,7 +60,10 @@ func (be *BrowserEngine) Navigate(url string) error {
 	if be.page == nil {
 		return fmt.Errorf("browser not launched")
 	}
-	return be.page.Navigate(url)
+	if err := be.page.Navigate(url); err != nil {
+		return err
+	}
+	return be.page.WaitLoad()
 }
 
 func (be *BrowserEngine) WaitLoad() error {
@@ -225,6 +229,66 @@ func (be *BrowserEngine) CloseTab(index int) error {
 
 func (be *BrowserEngine) TabCount() int {
 	return len(be.pages)
+}
+
+func (be *BrowserEngine) SetViewport(width, height int) error {
+	if be.page == nil {
+		return fmt.Errorf("browser not launched")
+	}
+	return be.page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+		Width:             width,
+		Height:            height,
+		DeviceScaleFactor: 1,
+	})
+}
+
+func (be *BrowserEngine) ScreenshotCompare(name string, baseline []byte) (bool, string, error) {
+	filename, err := be.Screenshot(name)
+	if err != nil {
+		return false, "", err
+	}
+	if baseline == nil {
+		return true, filename, nil
+	}
+	current, err := os.ReadFile(filename)
+	if err != nil {
+		return false, "", fmt.Errorf("read screenshot: %w", err)
+	}
+	if len(current) != len(baseline) {
+		return false, filename, nil
+	}
+	for i := range current {
+		if current[i] != baseline[i] {
+			return false, filename, nil
+		}
+	}
+	return true, filename, nil
+}
+
+func (be *BrowserEngine) GetLocalStorage() (map[string]string, error) {
+	if be.page == nil {
+		return nil, fmt.Errorf("browser not launched")
+	}
+	val, err := be.page.Eval(`() => JSON.stringify(localStorage)`)
+	if err != nil {
+		return nil, fmt.Errorf("get local storage: %w", err)
+	}
+	result := make(map[string]string)
+	json.Unmarshal([]byte(val.Value.String()), &result)
+	return result, nil
+}
+
+func (be *BrowserEngine) GetSessionStorage() (map[string]string, error) {
+	if be.page == nil {
+		return nil, fmt.Errorf("browser not launched")
+	}
+	val, err := be.page.Eval(`() => JSON.stringify(sessionStorage)`)
+	if err != nil {
+		return nil, fmt.Errorf("get session storage: %w", err)
+	}
+	result := make(map[string]string)
+	json.Unmarshal([]byte(val.Value.String()), &result)
+	return result, nil
 }
 
 func (be *BrowserEngine) WaitForSelector(selector string, timeout time.Duration) error {
