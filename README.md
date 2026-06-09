@@ -57,7 +57,7 @@ make build
 | `plan` | Interactive planning phase |
 | `build` | Execute the build pipeline |
 | `analyze` | Repository Intelligence Engine |
-| `agent` | Agent management |
+| `agent` | Spawn dynamic sub-agents |
 | `serve` | Serve generated artifacts |
 | `run` | Run a shell command |
 
@@ -86,11 +86,24 @@ routerforge analyze ast /path/to/go/repo
 # Detect with AST-powered capability extraction
 routerforge analyze detect --ast /path/to/go/repo
 
+# Function-level call graph (Go) — tracks pkg.func → pkg.func calls
+routerforge analyze callgraph /path/to/go/repo
+
+# Architecture fingerprinting (Go) — detects layered / hexagonal / MVC / DDD
+routerforge analyze arch /path/to/go/repo
+
 # Build capability matrix
 routerforge analyze matrix
 
 # Get integration recommendations
 routerforge analyze recommend api_server auth_system
+```
+
+### Dynamic Agent Spawning
+
+```bash
+# Spawn a sub-agent on demand (LLM creates the agent, runs the task, returns result)
+routerforge agent spawn "code_reviewer" "Review the auth package for security issues"
 ```
 
 ### Artifacts & Tracing
@@ -137,16 +150,19 @@ routerforge build --profile quick --tui
 
 ## Features
 
-- **Dynamic Agent Creation**: Agents and teams are synthesized by LLM from project requirements, not selected from a static list
-- **Multi-Agent Orchestration**: Head Manager delegates to Team Managers who coordinate Micro Agents
+- **Dynamic Agent Creation**: Agents and teams are synthesized by LLM from project requirements, not selected from a static list. Each agent gets a unique LLM-generated system prompt based on its role, description, tools, and tasks — no static templates.
+- **Multi-Agent Orchestration**: Head Manager delegates to Team Managers who coordinate Micro Agents. Agents can spawn sub-agents dynamically.
 - **Provider Gateway**: Pluggable LLM provider support (OpenCode, OpenAI-compatible)
-- **Tool Registry**: Extensible tool system (shell, file ops, search, web fetch)
+- **Tool Registry**: Extensible tool system (shell, file ops, search, web fetch) with per-agent permission sandboxing (allowed dirs, allowed/blocked commands, network toggle, file size limits)
 - **Event Bus**: Pub/sub lifecycle events for real-time monitoring
-- **Memory System**: In-memory store with context compression and checkpoint/restore
+- **Memory System**: In-memory store with context compression, checkpoint/restore, and scope-based access policies (read/write/admin levels with wildcard matching)
+- **Token Budget Tracking**: Per-agent, per-phase, and global token limits with automatic 90% usage warnings and hard caps
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
-- **Repository Intelligence**: AST-based code analysis extracts packages, functions, types, interfaces, and dependency graphs — not just file detection
+- **Repository Intelligence**: AST-based analysis (packages, functions, types, interfaces, dependency graphs), function-level call graphs, and architecture fingerprinting (layered, hexagonal, MVC, DDD)
 - **Pipeline Profiles**: Configurable build profiles (quick, full)
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
+- **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle
+- **Multi-Terminal Management**: Multiple concurrent shell sessions with command history
 
 ## Development
 
