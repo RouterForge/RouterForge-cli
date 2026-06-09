@@ -174,23 +174,46 @@ func (hm *HeadManager) Understand() error {
 	return nil
 }
 
+type modelInfo struct {
+	Name        string
+	Description string
+}
+
+var availableModels = []modelInfo{
+	{Name: "big-pickle", Description: "default, balanced"},
+	{Name: "deepseek-v4-flash-free", Description: "fast, good for simple/repetitive tasks"},
+	{Name: "mimo-v2.5-free", Description: "code generation strength"},
+	{Name: "nemotron-3-super-free", Description: "larger context, reasoning"},
+	{Name: "nemotron-3-ultra-free", Description: "highest quality, complex reasoning"},
+}
+
 func (hm *HeadManager) askModelChoice() string {
 	pterm.Info.Println("❓ Choose an AI model for your agents:")
 	pterm.Println("Available free models (tested working):")
-	pterm.Println("  1) big-pickle              (default, recommended)")
-	pterm.Println("  2) deepseek-v4-flash-free")
-	pterm.Println("  3) mimo-v2.5-free")
-	pterm.Println("  4) nemotron-3-super-free")
-	pterm.Println("  5) nemotron-3-ultra-free")
-	modelOpts := []string{
-		"big-pickle",
-		"deepseek-v4-flash-free",
-		"mimo-v2.5-free",
-		"nemotron-3-super-free",
-		"nemotron-3-ultra-free",
+	modelOpts := make([]string, len(availableModels))
+	for i, m := range availableModels {
+		desc := ""
+		if m.Description != "" {
+			desc = " (" + m.Description + ")"
+		}
+		if i == 0 {
+			desc += " (default, recommended)"
+		}
+		pterm.Printf("  %d) %s%s\n", i+1, m.Name, desc)
+		modelOpts[i] = m.Name
 	}
 	choice, _ := hm.userProxy.Choose("Choose an AI model for your agents:", modelOpts)
 	return choice
+}
+
+func modelPromptBlock() string {
+	var b strings.Builder
+	b.WriteString("Available models (pick the best fit per agent):\n")
+	for _, m := range availableModels {
+		b.WriteString(fmt.Sprintf("- %s (%s)\n", m.Name, m.Description))
+	}
+	b.WriteString("\nFor each agent you can suggest a model via \"model\" field. Leave empty to use the default.\n")
+	return b.String()
 }
 
 func (hm *HeadManager) Design() error {
@@ -219,7 +242,7 @@ func (hm *HeadManager) Design() error {
 	hm.logDecision("plan", fmt.Sprintf("Generated plan with %d teams via LLM", len(plan.Teams)))
 
 	for _, pt := range plan.Teams {
-		tm, err := hm.CreateTeam(pt.Domain)
+		tm, err := hm.CreateTeam(pt.Domain, pt.Model)
 		if err != nil {
 			pterm.Warning.Printfln("Failed to create team %s: %v", pt.Domain, err)
 			continue
@@ -272,19 +295,11 @@ func (hm *HeadManager) designInteractive() error {
 		if d == "" {
 			continue
 		}
-		hm.CreateTeam(d)
+		hm.CreateTeam(d, hm.model)
 	}
 	hm.logDecision("design", fmt.Sprintf("Teams created (interactive): %s", strings.Join(domains, ", ")))
 	pterm.Success.Printfln("Design complete — %d teams created", len(hm.teams))
 	return nil
-}
-
-var availableModels = []string{
-	"big-pickle",
-	"deepseek-v4-flash-free",
-	"mimo-v2.5-free",
-	"nemotron-3-super-free",
-	"nemotron-3-ultra-free",
 }
 
 func (hm *HeadManager) GeneratePlan() (*models.Plan, error) {
@@ -295,15 +310,7 @@ Goal: %s
 Tech Stack: %s
 Description: %s
 
-Available models (pick the best fit per agent):
-- big-pickle (default, balanced)
-- deepseek-v4-flash-free (fast, good for simple/repetitive tasks)
-- mimo-v2.5-free (code generation strength)
-- nemotron-3-super-free (larger context, reasoning)
-- nemotron-3-ultra-free (highest quality, complex reasoning)
-
-For each agent you can suggest a model via "model" field. Leave empty to use the default.
-
+%s
 Return ONLY a JSON object with this structure:
 {
   "summary": "brief summary of the plan",
@@ -311,6 +318,7 @@ Return ONLY a JSON object with this structure:
     {
       "domain": "the domain name (e.g., frontend, backend)",
       "lead": "role name for team lead",
+      "model": "suggested model for the team lead or empty string",
       "agents": [
         {
           "role": "agent_role_name",
@@ -329,7 +337,7 @@ Return ONLY a JSON object with this structure:
 }
 
 Include at least one agent per team. Each agent needs 2-4 concrete tasks.`,
-		hm.project.Name, hm.project.Goal, hm.project.TechStack, hm.project.Description)
+		hm.project.Name, hm.project.Goal, hm.project.TechStack, hm.project.Description, modelPromptBlock())
 
 	llm := engine.NewLLMClient(hm.model)
 	result, err := llm.Chat("You are a senior software architect. Generate structured JSON plans only.", prompt)
@@ -402,15 +410,17 @@ func stripMarkdown(s string) string {
 	s = strings.TrimSpace(s)
 	return s
 }
-
-func (hm *HeadManager) CreateTeam(domain string) (*TeamManager, error) {
+func (hm *HeadManager) CreateTeam(domain, model string) (*TeamManager, error) {
+	if model == "" {
+		model = hm.model
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	agent := &models.Agent{
 		ID:              fmt.Sprintf("team-%s", domain),
 		Role:            fmt.Sprintf("%s_lead", domain),
 		Type:            models.TypeTeamManager,
 		ParentID:        hm.project.ID,
-		Model:           hm.model,
+		Model:           model,
 		Status:          models.StatusCreated,
 		SystemPrompt:    fmt.Sprintf("You are the %s team lead. You manage micro-agents for %s domain.", domain, domain),
 		Tasks:           []models.Task{},
@@ -424,7 +434,7 @@ func (hm *HeadManager) CreateTeam(domain string) (*TeamManager, error) {
 
 	ctx := &Context{
 		Project: hm.project,
-		Model:   hm.model,
+		Model:   model,
 		Data:    make(map[string]string),
 		Memory:  hm.mem,
 		CostHandler: func(model, agentID, phase string, usage engine.Usage) {
@@ -440,7 +450,8 @@ func (hm *HeadManager) CreateTeam(domain string) (*TeamManager, error) {
 		Payload: fmt.Sprintf("team: %s (lead: %s)", domain, agent.Role),
 	})
 
-	pterm.Success.Printfln("  Created team: %s (lead: %s, model: %s)", domain, agent.Role, hm.model)
+	pterm.Success.Printfln("  Created team: %s (lead: %s, model: %s)", domain, agent.Role, model)
+
 	return tm, nil
 }
 

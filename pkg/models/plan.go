@@ -14,6 +14,7 @@ type Plan struct {
 type PlanTeam struct {
 	Domain  string      `json:"domain"`
 	Lead    string      `json:"lead"`
+	Model   string      `json:"model,omitempty"`
 	Agents  []PlanAgent `json:"agents"`
 }
 

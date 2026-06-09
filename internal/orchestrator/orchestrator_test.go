@@ -50,7 +50,7 @@ func TestHeadManager_SetMemory(t *testing.T) {
 
 func TestHeadManager_CreateTeam(t *testing.T) {
 	hm := NewHeadManager("test")
-	tm, err := hm.CreateTeam("frontend")
+	tm, err := hm.CreateTeam("frontend", "")
 	if err != nil {
 		t.Fatalf("CreateTeam failed: %v", err)
 	}

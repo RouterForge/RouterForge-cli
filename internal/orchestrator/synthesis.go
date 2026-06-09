@@ -213,7 +213,7 @@ func (hm *HeadManager) designSynthesized() error {
 	for _, a := range agents {
 		tm, ok := domainTeams[a.Domain]
 		if !ok {
-			tm, _ = hm.CreateTeam(a.Domain)
+			tm, _ = hm.CreateTeam(a.Domain, hm.model)
 			domainTeams[a.Domain] = tm
 		}
 		agent := BuildAgentFromPlan(hm.project.Goal, hm.model, models.PlanAgent{

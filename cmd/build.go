@@ -81,7 +81,7 @@ var buildCmd = &cobra.Command{
 			pterm.Warning.Printfln("Design fallback: %v", err)
 			pterm.Info.Println("Creating teams from profile config...")
 			for _, t := range teams {
-				hm.CreateTeam(t)
+				hm.CreateTeam(t, "")
 			}
 		}
 
