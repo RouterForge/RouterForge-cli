@@ -108,18 +108,20 @@ routerforge analyze recommend api_server auth_system
     └────────────┘ └────────────┘ └────────────┘
 ```
 
-**Operating Flow**: `Idle → Understand → Design → Execute → Review`
+**Operating Flow**: `Idle → Understand → Design (LLM-generated) → Execute → Review`
 
 ## Features
 
+- **Dynamic Agent Creation**: Agents and teams are synthesized by LLM from project requirements, not selected from a static list
 - **Multi-Agent Orchestration**: Head Manager delegates to Team Managers who coordinate Micro Agents
 - **Provider Gateway**: Pluggable LLM provider support (OpenCode, OpenAI-compatible)
 - **Tool Registry**: Extensible tool system (shell, file ops, search, web fetch)
 - **Event Bus**: Pub/sub lifecycle events for real-time monitoring
 - **Memory System**: In-memory store with context compression and checkpoint/restore
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
-- **Repository Intelligence**: Clone, analyze, detect patterns, build feature matrices
+- **Repository Intelligence**: AST-based code analysis extracts packages, functions, types, interfaces, and dependency graphs — not just file detection
 - **Pipeline Profiles**: Configurable build profiles (quick, full)
+- **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 
 ## Development
 

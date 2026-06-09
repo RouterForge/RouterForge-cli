@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"fmt"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/routerforge/cli/internal/memory"
@@ -61,6 +62,7 @@ var buildCmd = &cobra.Command{
 
 		hm := orchestrator.NewHeadManager(cfg.Model)
 		hm.SetMemory(memory.NewStore())
+		hm.SetTracePath(filepath.Join(routerDir, "artifacts", "trace.jsonl"))
 
 		if tuiFlag {
 			p := tui.NewProgram(hm)
@@ -72,64 +74,18 @@ var buildCmd = &cobra.Command{
 
 		hm.AttachConsoleLogger()
 		pterm.Info.Printfln("Building with model: %s", cfg.Model)
-		pterm.Info.Printfln("Teams: %v", teams)
+		pterm.Info.Printfln("Profile: %s (teams: %v)", profile, teams)
 
-		pterm.Info.Println("Creating teams for execution...")
-
-		teamMap := make(map[string]bool)
-		for _, t := range teams {
-			hm.CreateTeam(t)
-			teamMap[t] = true
-		}
-
-		if teamMap["backend"] {
-			backendTM := hm.Teams()["team-backend"]
-			if backendTM != nil {
-				backendTM.CreateMicroAgent("api_designer", []orchestrator.TaskDef{
-					{Description: "Design REST API endpoints", Priority: "high"},
-					{Description: "Define request/response schemas", Priority: "high"},
-					{Description: "Document API", Priority: "medium"},
-				}, cfg.Model)
-				backendTM.CreateMicroAgent("db_schema_designer", []orchestrator.TaskDef{
-					{Description: "Design database schema", Priority: "high"},
-					{Description: "Define relationships", Priority: "high"},
-				}, cfg.Model)
+		pterm.Info.Println("Designing team structure from requirements...")
+		if err := hm.Design(); err != nil {
+			pterm.Warning.Printfln("Design fallback: %v", err)
+			pterm.Info.Println("Creating teams from profile config...")
+			for _, t := range teams {
+				hm.CreateTeam(t)
 			}
 		}
 
-		if teamMap["frontend"] {
-			frontendTM := hm.Teams()["team-frontend"]
-			if frontendTM != nil {
-				frontendTM.CreateMicroAgent("component_builder", []orchestrator.TaskDef{
-					{Description: "Generate a complete SaaS landing page in a single HTML file", Priority: "high"},
-					{Description: "Style the landing page with responsive dark theme CSS", Priority: "high"},
-					{Description: "Add interactive JavaScript (smooth scroll, mobile menu, form handling)", Priority: "medium"},
-				}, cfg.Model)
-			}
-		}
-
-		if teamMap["security"] {
-			securityTM := hm.Teams()["team-security"]
-			if securityTM != nil {
-				securityTM.CreateMicroAgent("security_reviewer", []orchestrator.TaskDef{
-					{Description: "Review code for security vulnerabilities", Priority: "high"},
-					{Description: "Check for OWASP Top 10 violations", Priority: "high"},
-				}, cfg.Model)
-			}
-		}
-
-		if teamMap["qa"] {
-			qaTM := hm.Teams()["team-qa"]
-			if qaTM != nil {
-				qaTM.CreateMicroAgent("unit_test_writer", []orchestrator.TaskDef{
-					{Description: "Write unit tests for core functions", Priority: "high"},
-					{Description: "Write integration tests", Priority: "high"},
-				}, cfg.Model)
-			}
-		}
-
-		hm.SendMessage("head_manager", "all", "model_assignment", fmt.Sprintf("All agents using model: %s", cfg.Model))
-
+		pterm.Info.Println("Starting execution...")
 		if err := hm.Execute(); err != nil {
 			pterm.Error.Printfln("Execute phase failed: %v", err)
 			return
@@ -140,8 +96,27 @@ var buildCmd = &cobra.Command{
 			return
 		}
 
+		saveArtifactSummary(hm, routerDir)
 		pterm.DefaultSection.Printfln("✅ Build Complete")
+		pterm.Info.Printfln("📄 Trace: %s", filepath.Join(routerDir, "artifacts", "trace.jsonl"))
+		pterm.Info.Printfln("📄 Plan: %s", filepath.Join(routerDir, "artifacts", "plan.json"))
+		pterm.Info.Printfln("🌐 Dashboard: routerforge serve")
 	},
+}
+
+func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
+	artifactsDir := filepath.Join(routerDir, "artifacts")
+	summary := map[string]interface{}{
+		"project":     hm.Project().Name,
+		"model":       hm.Model(),
+		"teams":       len(hm.Teams()),
+		"decisions":   len(hm.Decisions()),
+		"plan":        hm.Plan() != nil,
+		"phases":      hm.StateHistory(),
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	data, _ := json.MarshalIndent(summary, "", "  ")
+	os.WriteFile(filepath.Join(artifactsDir, "summary.json"), data, 0644)
 }
 
 func init() {

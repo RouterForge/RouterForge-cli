@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var astFlag bool
+
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze",
 	Short: "Repository Intelligence Engine",
@@ -56,6 +58,26 @@ var detectCmd = &cobra.Command{
 
 		pd := &repo.PatternDetector{}
 		patterns := pd.Detect(path)
+
+		if astFlag && lang == "go" {
+			pterm.Info.Println("Running AST analysis...")
+			aa := &repo.ASTAnalyzer{}
+			pkgs, graph, err := aa.AnalyzeGoRepo(path)
+			if err != nil {
+				pterm.Warning.Printfln("AST analysis error: %v", err)
+			} else {
+				astPatterns := aa.DetectCapabilitiesFromAST(pkgs)
+				patterns = append(patterns, astPatterns...)
+				pterm.DefaultSection.Println("Dependency Graph")
+				fmt.Println(graph.Markdown())
+				pterm.DefaultSection.Printfln("AST Packages: %d", len(pkgs))
+				for _, pkg := range pkgs {
+					pterm.Printfln("  • %s (%d funcs, %d types, %d interfaces)",
+						pkg.Name, len(pkg.Functions), len(pkg.Types), len(pkg.Interfaces))
+				}
+			}
+		}
+
 		if len(patterns) == 0 {
 			pterm.Warning.Println("No patterns detected")
 			return
@@ -65,6 +87,62 @@ var detectCmd = &cobra.Command{
 			pterm.Printfln("  • %s (confidence: %.0f%%)", p.Name, p.Confidence*100)
 			for _, ind := range p.Indicators {
 				pterm.Printfln("    └ %s", ind)
+			}
+		}
+	},
+}
+
+var astCmd = &cobra.Command{
+	Use:   "ast <path>",
+	Short: "Analyze Go source code using AST",
+	Long:  `Parse Go source files into AST, extract packages, functions, types, interfaces, and build dependency graphs.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+
+		aa := &repo.ASTAnalyzer{}
+		pkgs, graph, err := aa.AnalyzeGoRepo(path)
+		if err != nil {
+			pterm.Error.Printfln("AST analysis failed: %v", err)
+			return
+		}
+
+		pterm.DefaultSection.Printfln("Go AST Analysis: %d packages", len(pkgs))
+		for _, pkg := range pkgs {
+			pterm.DefaultSection.Printfln("Package: %s (%s)", pkg.Name, pkg.Path)
+			pterm.Printfln("  Imports: %d", len(pkg.Imports))
+			pterm.Printfln("  Functions: %d", len(pkg.Functions))
+			for _, fn := range pkg.Functions {
+				export := " "
+				if fn.IsExported {
+					export = "✓"
+				}
+				pterm.Printfln("    [%s] %s(%s) (%s) line:%d", export, fn.Name, fn.Params, fn.Results, fn.Line)
+			}
+			pterm.Printfln("  Types: %d", len(pkg.Types))
+			for _, t := range pkg.Types {
+				export := " "
+				if t.IsExported {
+					export = "✓"
+				}
+				pterm.Printfln("    [%s] %s (%s) line:%d", export, t.Name, t.Kind, t.Line)
+			}
+			if len(pkg.Interfaces) > 0 {
+				pterm.Printfln("  Interfaces: %d", len(pkg.Interfaces))
+				for _, iface := range pkg.Interfaces {
+					pterm.Printfln("    • %s (%d methods)", iface.Name, len(iface.Methods))
+				}
+			}
+		}
+
+		pterm.DefaultSection.Println("Dependency Graph")
+		fmt.Println(graph.Markdown())
+
+		detected := aa.DetectCapabilitiesFromAST(pkgs)
+		if len(detected) > 0 {
+			pterm.DefaultSection.Printfln("Capabilities detected: %d", len(detected))
+			for _, p := range detected {
+				pterm.Printfln("  • %s: %s", p.Name, p.Indicators[0])
 			}
 		}
 	},
@@ -173,5 +251,7 @@ func init() {
 	analyzeCmd.AddCommand(listCmd)
 	analyzeCmd.AddCommand(matrixCmd)
 	analyzeCmd.AddCommand(recommendCmd)
+	analyzeCmd.AddCommand(astCmd)
+	detectCmd.Flags().BoolVar(&astFlag, "ast", false, "Use AST analysis for Go repos")
 	rootCmd.AddCommand(analyzeCmd)
 }
