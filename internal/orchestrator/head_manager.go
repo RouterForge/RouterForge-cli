@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -179,19 +182,114 @@ type modelInfo struct {
 	Description string
 }
 
-var availableModels = []modelInfo{
-	{Name: "big-pickle", Description: "default, balanced"},
-	{Name: "deepseek-v4-flash-free", Description: "fast, good for simple/repetitive tasks"},
-	{Name: "mimo-v2.5-free", Description: "code generation strength"},
-	{Name: "nemotron-3-super-free", Description: "larger context, reasoning"},
-	{Name: "nemotron-3-ultra-free", Description: "highest quality, complex reasoning"},
+var (
+	muModels      sync.RWMutex
+	cachedModels  []modelInfo
+	modelsFetched time.Time
+	modelsTTL     = 5 * time.Minute
+)
+
+var modelDescriptions = map[string]string{
+	"big-pickle":                 "default, balanced",
+	"deepseek-v4-flash-free":     "fast, good for simple/repetitive tasks",
+	"mimo-v2.5-free":             "code generation strength",
+	"minimax-m3-free":            "general purpose free model",
+	"nemotron-3-super-free":      "larger context, reasoning",
+	"nemotron-3-ultra-free":      "highest quality, complex reasoning",
+	"north-mini-code-free":       "code generation, lightweight",
+	"qwen3.6-plus-free":          "general purpose free model",
+}
+
+func describeModel(name string) string {
+	if d, ok := modelDescriptions[name]; ok {
+		return d
+	}
+	if strings.HasSuffix(name, "ultra-free") {
+		return "highest quality, complex reasoning"
+	}
+	if strings.HasSuffix(name, "super-free") {
+		return "larger context, reasoning"
+	}
+	if strings.HasSuffix(name, "flash-free") {
+		return "fast, good for simple/repetitive tasks"
+	}
+	if strings.HasSuffix(name, "mini-code-free") {
+		return "code generation, lightweight"
+	}
+	if strings.HasSuffix(name, "code-free") {
+		return "code generation"
+	}
+	if strings.HasSuffix(name, "free") {
+		return "general purpose free model"
+	}
+	return ""
+}
+
+func fetchAvailableModels() []modelInfo {
+	muModels.RLock()
+	if time.Since(modelsFetched) < modelsTTL && len(cachedModels) > 0 {
+		defer muModels.RUnlock()
+		return cachedModels
+	}
+	muModels.RUnlock()
+
+	muModels.Lock()
+	defer muModels.Unlock()
+
+	if time.Since(modelsFetched) < modelsTTL && len(cachedModels) > 0 {
+		return cachedModels
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://opencode.ai/zen/v1/models")
+	if err != nil {
+		pterm.Warning.Printfln("Failed to fetch model list: %v, using defaults", err)
+		return defaultModels()
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		pterm.Warning.Printfln("Failed to parse model list: %v, using defaults", err)
+		return defaultModels()
+	}
+
+	var models []modelInfo
+	for _, m := range result.Data {
+		// Only include free models + big-pickle
+		if m.ID == "big-pickle" || strings.HasSuffix(m.ID, "-free") {
+			models = append(models, modelInfo{
+				Name:        m.ID,
+				Description: describeModel(m.ID),
+			})
+		}
+	}
+	if len(models) == 0 {
+		models = defaultModels()
+	}
+	cachedModels = models
+	modelsFetched = time.Now()
+	return models
+}
+
+func defaultModels() []modelInfo {
+	return []modelInfo{
+		{Name: "big-pickle", Description: "default, balanced"},
+		{Name: "deepseek-v4-flash-free", Description: "fast, good for simple/repetitive tasks"},
+	}
 }
 
 func (hm *HeadManager) askModelChoice() string {
+	models := fetchAvailableModels()
 	pterm.Info.Println("❓ Choose an AI model for your agents:")
-	pterm.Println("Available free models (tested working):")
-	modelOpts := make([]string, len(availableModels))
-	for i, m := range availableModels {
+	pterm.Println("Available free models (fetched from API):")
+	modelOpts := make([]string, len(models))
+	for i, m := range models {
 		desc := ""
 		if m.Description != "" {
 			desc = " (" + m.Description + ")"
@@ -207,9 +305,10 @@ func (hm *HeadManager) askModelChoice() string {
 }
 
 func modelPromptBlock() string {
+	models := fetchAvailableModels()
 	var b strings.Builder
-	b.WriteString("Available models (pick the best fit per agent):\n")
-	for _, m := range availableModels {
+	b.WriteString("Available free models (pick the best fit per agent):\n")
+	for _, m := range models {
 		b.WriteString(fmt.Sprintf("- %s (%s)\n", m.Name, m.Description))
 	}
 	b.WriteString("\nFor each agent you can suggest a model via \"model\" field. Leave empty to use the default.\n")
