@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/routerforge/cli/internal/repo"
+	"github.com/routerforge/cli/pkg/models"
 )
 
 type Capability struct {
@@ -210,16 +211,7 @@ func (e *Engine) DeepStudy(path string) (*DeepStudyResult, error) {
 			}
 			result.Patterns = patterns
 
-			cgGraph := repo.NewCapabilityGraph()
-			for _, pkg := range astPkgs {
-				cgGraph.Add(pkg.Name, "AST detected package", nil)
-				for _, fn := range pkg.Functions {
-					if fn.IsExported {
-						cgGraph.Add(pkg.Name+"."+fn.Name, "Exported function", []string{pkg.Name})
-					}
-				}
-			}
-			result.CapGraph = cgGraph
+			result.CapGraph = AutoBuildCapabilityGraph(result)
 		}
 
 		callGraph, cgErr := e.ast.BuildCallGraph(path)
@@ -272,9 +264,203 @@ func (e *Engine) DeepStudy(path string) (*DeepStudyResult, error) {
 	return result, nil
 }
 
+// DeepStudyCodebase performs a single-pass analysis that returns the complete
+// semantic Codebase model. This is the V2 entry point for Repository Intelligence.
+func (e *Engine) DeepStudyCodebase(path string) (*models.Codebase, error) {
+	cb, err := e.ast.AnalyzeToCodebase(path)
+	if err != nil {
+		return nil, fmt.Errorf("analyze to codebase: %w", err)
+	}
+
+	// surface-level capabilities supplement the AST-derived ones
+	surfaceCaps, _ := e.StudyRepo(path)
+	for _, sc := range surfaceCaps {
+		cb.Capabilities = append(cb.Capabilities, &models.Capability{
+			Name:        sc.Name,
+			Description: sc.Description,
+			Confidence:  0.6,
+			Category:    "surface",
+			Sources:     []models.Location{{File: path, Line: 1}},
+			Evidence:    []string{sc.Description},
+		})
+	}
+
+	return cb, nil
+}
+
 func (e *Engine) ToJSON() string {
 	b, _ := json.MarshalIndent(e.graph, "", "  ")
 	return string(b)
+}
+
+func AutoBuildCapabilityGraph(result *DeepStudyResult) *repo.CapabilityGraph {
+	g := repo.NewCapabilityGraph()
+
+	if result == nil {
+		return g
+	}
+
+	for _, p := range result.Patterns {
+		name := p.Name
+		desc := fmt.Sprintf("Detected pattern: %s (%.0f%% confidence)", p.Name, p.Confidence*100)
+		g.Add(name, desc, nil)
+	}
+
+	if result.ArchProfile != nil {
+		g.Add("arch_"+result.ArchProfile.Architecture,
+			fmt.Sprintf("Architecture: %s (%d layers)", result.ArchProfile.Architecture, len(result.ArchProfile.Layers)),
+			nil)
+		for _, layer := range result.ArchProfile.Layers {
+			g.Add("layer_"+layer, fmt.Sprintf("Architecture layer: %s", layer), []string{"arch_" + result.ArchProfile.Architecture})
+		}
+	}
+
+	for _, pkg := range result.ASTPackages {
+		g.Add("pkg_"+pkg.Name, fmt.Sprintf("Package: %s (%d functions, %d types, %d interfaces)",
+			pkg.Name, len(pkg.Functions), len(pkg.Types), len(pkg.Interfaces)),
+			detectPackageDeps(pkg, result.ASTPackages))
+
+		for _, iface := range pkg.Interfaces {
+			g.Add("iface_"+pkg.Name+"."+iface.Name,
+				fmt.Sprintf("Interface %s with %d methods", iface.Name, len(iface.Methods)),
+				[]string{"pkg_" + pkg.Name})
+		}
+
+		capName := detectPackageCapability(pkg.Name, pkg.Imports)
+		if capName != "" {
+			g.Add(pkg.Name+"_"+capName, fmt.Sprintf("Package %s provides %s", pkg.Name, capName),
+				[]string{"pkg_" + pkg.Name})
+		}
+
+		if containsHTTP(pkg.Imports) {
+			g.Add("http_handler_"+pkg.Name, fmt.Sprintf("HTTP handler in %s", pkg.Name),
+				[]string{"pkg_" + pkg.Name, "pattern_http_server"})
+		}
+		if containsDatabase(pkg.Imports) {
+			g.Add("db_access_"+pkg.Name, fmt.Sprintf("Database access in %s", pkg.Name),
+				[]string{"pkg_" + pkg.Name})
+		}
+	}
+
+	if result.ImportGraph != nil {
+		for _, edge := range result.ImportGraph.Edges {
+			src := findPackageNode(edge.Source, g)
+			tgt := findPackageNode(edge.Target, g)
+			if src != "" && tgt != "" {
+				if g.Nodes[src] != nil && !contains(g.Nodes[src].Requires, tgt) {
+					g.Nodes[src].Requires = append(g.Nodes[src].Requires, tgt)
+				}
+			}
+		}
+	}
+
+	if result.CallGraph != nil && len(result.CallGraph.Edges) > 0 {
+		g.Add("has_callgraph", fmt.Sprintf("Call graph: %d nodes, %d edges", len(result.CallGraph.Nodes), len(result.CallGraph.Edges)),
+			nil)
+	}
+
+	return g
+}
+
+func detectPackageDeps(pkg *repo.PackageInfo, allPkgs []*repo.PackageInfo) []string {
+	var deps []string
+	for _, imp := range pkg.Imports {
+		short := shortenImport(imp)
+		if short != "" && short != pkg.Name {
+			for _, other := range allPkgs {
+				if other.Name == short {
+					deps = append(deps, "pkg_"+short)
+					break
+				}
+			}
+		}
+	}
+	return deps
+}
+
+func detectPackageCapability(name string, imports []string) string {
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "auth") || strings.Contains(lower, "login") || strings.Contains(lower, "user") {
+		return "auth_system"
+	}
+	if strings.Contains(lower, "api") || strings.Contains(lower, "handler") || strings.Contains(lower, "route") {
+		return "api_layer"
+	}
+	if strings.Contains(lower, "db") || strings.Contains(lower, "database") || strings.Contains(lower, "store") || strings.Contains(lower, "repo") || strings.Contains(lower, "model") {
+		return "data_layer"
+	}
+	if strings.Contains(lower, "cache") || strings.Contains(lower, "redis") || strings.Contains(lower, "mem") {
+		return "caching"
+	}
+	if strings.Contains(lower, "cli") || strings.Contains(lower, "cmd") || strings.Contains(lower, "command") {
+		return "cli_interface"
+	}
+	if strings.Contains(lower, "config") || strings.Contains(lower, "setting") {
+		return "configuration"
+	}
+	if strings.Contains(lower, "test") || strings.Contains(lower, "spec") || strings.Contains(lower, "mock") {
+		return "testing"
+	}
+	if strings.Contains(lower, "event") || strings.Contains(lower, "bus") || strings.Contains(lower, "pub") || strings.Contains(lower, "sub") {
+		return "event_system"
+	}
+	if strings.Contains(lower, "plugin") || strings.Contains(lower, "extens") {
+		return "plugin_system"
+	}
+	if strings.Contains(lower, "agent") || strings.Contains(lower, "orchestrat") {
+		return "agent_system"
+	}
+	if strings.Contains(lower, "monitor") || strings.Contains(lower, "log") || strings.Contains(lower, "metric") || strings.Contains(lower, "trace") {
+		return "observability"
+	}
+	if strings.Contains(lower, "middleware") || strings.Contains(lower, "filter") || strings.Contains(lower, "interceptor") {
+		return "middleware"
+	}
+	return ""
+}
+
+func containsHTTP(imports []string) bool {
+	for _, imp := range imports {
+		lower := strings.ToLower(imp)
+		if strings.Contains(lower, "http") || strings.Contains(lower, "gin") || strings.Contains(lower, "echo") || strings.Contains(lower, "fiber") || strings.Contains(lower, "chi") || strings.Contains(lower, "mux") {
+			return true
+		}
+	}
+	return false
+}
+
+func containsDatabase(imports []string) bool {
+	for _, imp := range imports {
+		lower := strings.ToLower(imp)
+		if strings.Contains(lower, "sql") || strings.Contains(lower, "db") || strings.Contains(lower, "database") || strings.Contains(lower, "bolt") || strings.Contains(lower, "redis") || strings.Contains(lower, "mongo") || strings.Contains(lower, "postgres") || strings.Contains(lower, "mysql") {
+			return true
+		}
+	}
+	return false
+}
+
+func findPackageNode(name string, g *repo.CapabilityGraph) string {
+	if g.Nodes["pkg_"+name] != nil {
+		return "pkg_" + name
+	}
+	return ""
+}
+
+func shortenImport(imp string) string {
+	parts := strings.Split(imp, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return imp
+}
+
+func contains(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) Markdown() string {

@@ -2,7 +2,11 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -143,7 +147,10 @@ func (s *BrowserSession) Navigate(url string) error {
 	if s.Page == nil {
 		return fmt.Errorf("no page in session")
 	}
-	return s.Page.Navigate(url)
+	if err := s.Page.Navigate(url); err != nil {
+		return err
+	}
+	return s.Page.WaitLoad()
 }
 
 func (s *BrowserSession) Screenshot(name string) ([]byte, error) {
@@ -153,6 +160,26 @@ func (s *BrowserSession) Screenshot(name string) ([]byte, error) {
 	return s.Page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format: proto.PageCaptureScreenshotFormatPng,
 	})
+}
+
+func (s *BrowserSession) ScreenshotFullPage(name string) ([]byte, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	return s.Page.Screenshot(true, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+}
+
+func (s *BrowserSession) ScreenshotElement(selector string) ([]byte, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	el, err := s.Page.Element(selector)
+	if err != nil {
+		return nil, fmt.Errorf("element %s: %w", selector, err)
+	}
+	return el.Screenshot(proto.PageCaptureScreenshotFormatPng, 0)
 }
 
 func (s *BrowserSession) HTML() (string, error) {
@@ -189,6 +216,69 @@ func (s *BrowserSession) Type(selector, text string) error {
 		return err
 	}
 	return el.Input(text)
+}
+
+func (s *BrowserSession) FillField(selector, value string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	el, err := s.Page.Element(selector)
+	if err != nil {
+		return fmt.Errorf("field %s: %w", selector, err)
+	}
+	if err := el.SelectText(""); err == nil {
+		_ = el.Input(value)
+		return nil
+	}
+	return el.Input(value)
+}
+
+func (s *BrowserSession) SelectOption(selector, value string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	el, err := s.Page.Element(selector)
+	if err != nil {
+		return fmt.Errorf("select %s: %w", selector, err)
+	}
+	return el.Select([]string{value}, true, rod.SelectorTypeText)
+}
+
+func (s *BrowserSession) UploadFile(selector, filePath string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	el, err := s.Page.Element(selector)
+	if err != nil {
+		return fmt.Errorf("file input %s: %w", selector, err)
+	}
+	return el.SetFiles([]string{filePath})
+}
+
+func (s *BrowserSession) Submit(selector string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	el, err := s.Page.Element(selector)
+	if err != nil {
+		return fmt.Errorf("form %s: %w", selector, err)
+	}
+	_, err = el.Eval(`() => { const f = this; if (f.tagName === 'FORM') { f.submit(); return true; } else { const form = f.closest('form'); if (form) { form.submit(); return true; } return false; } }`)
+	if err != nil {
+		return fmt.Errorf("submit failed: %w", err)
+	}
+	return nil
+}
+
+func (s *BrowserSession) PrintToPDF() ([]byte, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	stream, err := s.Page.PDF(&proto.PagePrintToPDF{})
+	if err != nil {
+		return nil, fmt.Errorf("pdf: %w", err)
+	}
+	return io.ReadAll(stream)
 }
 
 func (s *BrowserSession) GetCookies() ([]*proto.NetworkCookie, error) {
@@ -235,4 +325,172 @@ func (s *BrowserSession) WaitForSelector(selector string, timeout time.Duration)
 	defer cancel()
 	_, err := s.Page.Context(ctx).Element(selector)
 	return err
+}
+
+func (s *BrowserSession) GetLocalStorage() (map[string]string, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	val, err := s.Page.Eval(`() => JSON.stringify(localStorage)`)
+	if err != nil {
+		return nil, fmt.Errorf("get local storage: %w", err)
+	}
+	result := make(map[string]string)
+	json.Unmarshal([]byte(val.Value.String()), &result)
+	return result, nil
+}
+
+func (s *BrowserSession) GetSessionStorage() (map[string]string, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	val, err := s.Page.Eval(`() => JSON.stringify(sessionStorage)`)
+	if err != nil {
+		return nil, fmt.Errorf("get session storage: %w", err)
+	}
+	result := make(map[string]string)
+	json.Unmarshal([]byte(val.Value.String()), &result)
+	return result, nil
+}
+
+func (s *BrowserSession) SetLocalStorage(data map[string]string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	js := "(() => { localStorage.clear();"
+	for k, v := range data {
+		js += fmt.Sprintf(" localStorage.setItem(%q,%q);", k, v)
+	}
+	js += " return true; })()"
+	_, err := s.Page.Eval(js)
+	return err
+}
+
+func (s *BrowserSession) SetSessionStorage(data map[string]string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	js := "(() => { sessionStorage.clear();"
+	for k, v := range data {
+		js += fmt.Sprintf(" sessionStorage.setItem(%q,%q);", k, v)
+	}
+	js += " return true; })()"
+	_, err := s.Page.Eval(js)
+	return err
+}
+
+func (s *BrowserSession) ExportSessionData() (map[string]interface{}, error) {
+	cookies, err := s.GetCookies()
+	if err != nil {
+		return nil, err
+	}
+	local, err := s.GetLocalStorage()
+	if err != nil {
+		return nil, err
+	}
+	session, err := s.GetSessionStorage()
+	if err != nil {
+		return nil, err
+	}
+	cookieMarshaled := make([]map[string]interface{}, 0, len(cookies))
+	for _, c := range cookies {
+		cookieMarshaled = append(cookieMarshaled, map[string]interface{}{
+			"name": c.Name, "value": c.Value, "domain": c.Domain, "path": c.Path,
+		})
+	}
+	return map[string]interface{}{
+		"cookies":        cookieMarshaled,
+		"localStorage":   local,
+		"sessionStorage": session,
+	}, nil
+}
+
+func (s *BrowserSession) ImportSessionData(data map[string]interface{}) error {
+	if cookies, ok := data["cookies"].([]interface{}); ok {
+		for _, c := range cookies {
+			if cm, ok := c.(map[string]interface{}); ok {
+				_ = s.SetCookie(
+					toString(cm["name"]),
+					toString(cm["value"]),
+					toString(cm["domain"]),
+					toString(cm["path"]),
+				)
+			}
+		}
+	}
+	if local, ok := data["localStorage"].(map[string]interface{}); ok {
+		strMap := make(map[string]string)
+		for k, v := range local {
+			strMap[k] = toString(v)
+		}
+		_ = s.SetLocalStorage(strMap)
+	}
+	return nil
+}
+
+func (s *BrowserSession) GetResourceTiming() ([]map[string]interface{}, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	val, err := s.Page.Eval(`() => JSON.stringify(performance.getEntriesByType('resource'))`)
+	if err != nil {
+		return nil, fmt.Errorf("resource timing: %w", err)
+	}
+	var entries []map[string]interface{}
+	json.Unmarshal([]byte(val.Value.String()), &entries)
+	return entries, nil
+}
+
+func (s *BrowserSession) GetPerformanceMetrics() (map[string]interface{}, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	val, err := s.Page.Eval(`() => {
+		const n = performance.getEntriesByType('navigation')[0];
+		return JSON.stringify({
+			domContentLoaded: n ? n.domContentLoadedEventEnd - n.domContentLoadedEventStart : 0,
+			loadTime: n ? n.loadEventEnd - n.loadEventStart : 0,
+			domInteractive: n ? n.domInteractive : 0,
+			totalTime: n ? n.loadEventEnd : 0,
+			fetchTime: n ? n.responseEnd - n.fetchStart : 0,
+			redirectCount: n ? n.redirectCount : 0,
+			transferSize: n ? n.transferSize : 0,
+			encodedBodySize: n ? n.encodedBodySize : 0,
+			decodedBodySize: n ? n.decodedBodySize : 0,
+		});
+	}`)
+	if err != nil {
+		return nil, fmt.Errorf("performance metrics: %w", err)
+	}
+	var metrics map[string]interface{}
+	json.Unmarshal([]byte(val.Value.String()), &metrics)
+	return metrics, nil
+}
+
+func (s *BrowserSession) DownloadFile(url string, downloadDir string) (string, error) {
+	if s.Page == nil || s.Browser == nil {
+		return "", fmt.Errorf("no page or browser in session")
+	}
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		return "", fmt.Errorf("create download dir: %w", err)
+	}
+
+	wait := s.Browser.WaitDownload(downloadDir)
+	if err := s.Page.Navigate(url); err != nil {
+		return "", fmt.Errorf("navigate for download: %w", err)
+	}
+	dl := wait()
+	base := filepath.Base(dl.URL)
+	if base == "" || base == "." {
+		base = fmt.Sprintf("download_%d", time.Now().UnixNano())
+	}
+	filename := filepath.Join(downloadDir, base)
+	return filename, nil
+}
+
+func (s *BrowserSession) WaitLoadStable(timeoutSec int) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	return s.Page.WaitStable(1 * time.Second)
 }

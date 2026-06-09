@@ -40,6 +40,7 @@ type HeadManager struct {
 	sandbox           *ToolSandbox
 	spawner  *engine.AgentSpawner
 	scheduler *Scheduler
+	runtime   *Runtime
 }
 
 func NewHeadManager(model string) *HeadManager {
@@ -75,6 +76,7 @@ func NewHeadManager(model string) *HeadManager {
 		scheduler:        NewScheduler(3),
 	}
 	hm.scheduler.Start()
+	hm.runtime = NewRuntime(hm.sandbox, hm.scheduler)
 	return hm
 }
 
@@ -337,6 +339,9 @@ func (hm *HeadManager) MemoryPolicy() *MemoryPolicy { return hm.memPolicy }
 func (hm *HeadManager) Sandbox() *ToolSandbox { return hm.sandbox }
 func (hm *HeadManager) Spawner() *engine.AgentSpawner { return hm.spawner }
 func (hm *HeadManager) Scheduler() *Scheduler { return hm.scheduler }
+func (hm *HeadManager) Runtime() *Runtime { return hm.runtime }
+func (hm *HeadManager) ResourceManager() *ResourceManager { return hm.runtime.ResourceMgr }
+func (hm *HeadManager) MemoryPool() *MemoryPool { return hm.runtime.MemoryPool }
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
 

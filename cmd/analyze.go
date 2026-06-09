@@ -14,6 +14,7 @@ import (
 )
 
 var astFlag bool
+var fromFlag string
 
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze",
@@ -217,27 +218,55 @@ var matrixCmd = &cobra.Command{
 var recommendCmd = &cobra.Command{
 	Use:   "recommend <features...>",
 	Short: "Get integration recommendations based on needed features",
+	Long:  `Recommends integration order for features. Use --from <path> to build capability graph from real AST analysis instead of the static graph.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		g := repo.NewCapabilityGraph()
-		g.Add("containerized", "Runs in Docker containers", nil)
-		g.Add("ci_cd", "Has CI/CD pipelines", nil)
-		g.Add("language_go", "Written in Go", nil)
-		g.Add("language_python", "Written in Python", nil)
-		g.Add("language_ts", "Written in TypeScript", nil)
-		g.Add("web_framework", "Has web framework", []string{"language_go", "language_python", "language_ts"})
-		g.Add("api_server", "Has API server", []string{"web_framework"})
-		g.Add("database", "Has database support", []string{"api_server"})
-		g.Add("auth_system", "Has authentication", []string{"api_server"})
-		g.Add("cli_tool", "Is a CLI application", []string{"language_go", "language_python", "language_ts"})
-		g.Add("plugin_system", "Has plugin/extension system", []string{"cli_tool"})
+
+		if fromFlag != "" {
+			pterm.Info.Printfln("Analyzing %s to build capability graph...", fromFlag)
+			fe := fusion.NewEngine()
+			result, err := fe.DeepStudy(fromFlag)
+			if err != nil {
+				pterm.Error.Printfln("Analysis failed: %v — falling back to static graph", err)
+			} else {
+				g = fusion.AutoBuildCapabilityGraph(result)
+				pterm.Success.Printfln("Auto-built graph with %d capabilities", len(g.Nodes))
+			}
+		}
+
+		if len(g.Nodes) == 0 {
+			g.Add("containerized", "Runs in Docker containers", nil)
+			g.Add("ci_cd", "Has CI/CD pipelines", nil)
+			g.Add("language_go", "Written in Go", nil)
+			g.Add("language_python", "Written in Python", nil)
+			g.Add("language_ts", "Written in TypeScript", nil)
+			g.Add("web_framework", "Has web framework", []string{"language_go", "language_python", "language_ts"})
+			g.Add("api_server", "Has API server", []string{"web_framework"})
+			g.Add("database", "Has database support", []string{"api_server"})
+			g.Add("auth_system", "Has authentication", []string{"api_server"})
+			g.Add("cli_tool", "Is a CLI application", []string{"language_go", "language_python", "language_ts"})
+			g.Add("plugin_system", "Has plugin/extension system", []string{"cli_tool"})
+		}
 
 		r := repo.NewRecommender(g)
 		order := r.Recommend(args)
 
 		pterm.DefaultSection.Printfln("Integration order for: %s", strings.Join(args, ", "))
 		for i, item := range order {
-			pterm.Printfln("  %d. %s", i+1, item)
+			gap, required := 0, ""
+			if node, ok := g.Nodes[item]; ok && len(node.Requires) > 0 {
+				required = strings.Join(node.Requires, ", ")
+				gap = 1
+			}
+			mark := " "
+			if gap == 0 {
+				mark = "⊢"
+			}
+			pterm.Printfln("  %d. %s%s", i+1, mark, item)
+			if required != "" {
+				pterm.Printfln("     requires: %s", required)
+			}
 		}
 
 		if b, err := json.MarshalIndent(order, "", "  "); err == nil {
@@ -497,5 +526,6 @@ func init() {
 	fusionCmd.AddCommand(fusionDeepCmd)
 	fusionCmd.AddCommand(fusionRemoteCmd)
 	detectCmd.Flags().BoolVar(&astFlag, "ast", false, "Use AST analysis for Go repos")
+	recommendCmd.Flags().StringVar(&fromFlag, "from", "", "Path to analyze for auto-building capability graph")
 	rootCmd.AddCommand(analyzeCmd)
 }

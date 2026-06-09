@@ -325,13 +325,14 @@ func registerAPICall(r *Registry) {
 }
 
 func registerBrowserAction(r *Registry) {
-	r.Register(sk("browser_action", "Control a headless browser (navigate, click, type, screenshot, html, evaluate)",
-		json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["navigate","click","type","screenshot","html","evaluate","cookies","viewport"]},"value":{"type":"string"},"selector":{"type":"string","default":""}},"required":["action","value"]}`),
+	r.Register(sk("browser_action", "Control a headless browser with full runtime support",
+		json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["navigate","click","type","screenshot","html","evaluate","cookies","viewport","fill","select","upload","submit","pdf","screenshot_full","screenshot_element","local_storage","session_storage","performance","resource_timing","console","new_tab","switch_tab","close_tab","tab_list","broadcast","wait_selector"]},"value":{"type":"string","default":""},"selector":{"type":"string","default":""},"secondary":{"type":"string","default":""}},"required":["action"]}`),
 		func(ctx context.Context, raw json.RawMessage) (string, error) {
 			var p struct {
-				Action   string `json:"action"`
-				Value    string `json:"value"`
-				Selector string `json:"selector"`
+				Action    string `json:"action"`
+				Value     string `json:"value"`
+				Selector  string `json:"selector"`
+				Secondary string `json:"secondary"`
 			}
 			json.Unmarshal(raw, &p)
 
@@ -358,12 +359,44 @@ func registerBrowserAction(r *Registry) {
 					return "", fmt.Errorf("type: %w", err)
 				}
 				return fmt.Sprintf("Typed '%s' into %s", p.Value, p.Selector), nil
+			case "fill":
+				if err := be.FillField(p.Selector, p.Value); err != nil {
+					return "", fmt.Errorf("fill: %w", err)
+				}
+				return fmt.Sprintf("Filled %s with '%s'", p.Selector, p.Value), nil
+			case "select":
+				if err := be.SelectOption(p.Selector, p.Value); err != nil {
+					return "", fmt.Errorf("select: %w", err)
+				}
+				return fmt.Sprintf("Selected '%s' in %s", p.Value, p.Selector), nil
+			case "upload":
+				if err := be.UploadFile(p.Selector, p.Value); err != nil {
+					return "", fmt.Errorf("upload: %w", err)
+				}
+				return fmt.Sprintf("Uploaded %s to %s", p.Value, p.Selector), nil
+			case "submit":
+				if err := be.Submit(p.Selector); err != nil {
+					return "", fmt.Errorf("submit: %w", err)
+				}
+				return fmt.Sprintf("Submitted form %s", p.Selector), nil
 			case "screenshot":
 				filename, err := be.Screenshot(p.Value)
 				if err != nil {
 					return "", fmt.Errorf("screenshot: %w", err)
 				}
 				return fmt.Sprintf("Screenshot saved to %s", filename), nil
+			case "screenshot_full":
+				filename, err := be.ScreenshotFullPage(p.Value)
+				if err != nil {
+					return "", fmt.Errorf("full page screenshot: %w", err)
+				}
+				return fmt.Sprintf("Full page screenshot saved to %s", filename), nil
+			case "screenshot_element":
+				filename, err := be.ScreenshotElement(p.Value, p.Selector)
+				if err != nil {
+					return "", fmt.Errorf("element screenshot: %w", err)
+				}
+				return fmt.Sprintf("Element screenshot saved to %s", filename), nil
 			case "html":
 				html, err := be.HTML()
 				if err != nil {
@@ -381,9 +414,89 @@ func registerBrowserAction(r *Registry) {
 				if err != nil {
 					return "", fmt.Errorf("cookies: %w", err)
 				}
-				return fmt.Sprintf("Cookies (%d): %+v", len(cookies), cookies), nil
+				b, _ := json.Marshal(cookies)
+				return fmt.Sprintf("Cookies (%d): %s", len(cookies), string(b)), nil
 			case "viewport":
 				return "Viewport requires SetViewport(width, height). Use browser CLI.", nil
+			case "local_storage":
+				data, err := be.GetLocalStorage()
+				if err != nil {
+					return "", fmt.Errorf("local storage: %w", err)
+				}
+				b, _ := json.Marshal(data)
+				return fmt.Sprintf("LocalStorage: %s", string(b)), nil
+			case "session_storage":
+				data, err := be.GetSessionStorage()
+				if err != nil {
+					return "", fmt.Errorf("session storage: %w", err)
+				}
+				b, _ := json.Marshal(data)
+				return fmt.Sprintf("SessionStorage: %s", string(b)), nil
+			case "performance":
+				metrics, err := be.GetPerformanceMetrics()
+				if err != nil {
+					return "", fmt.Errorf("performance: %w", err)
+				}
+				b, _ := json.MarshalIndent(metrics, "", "  ")
+				return fmt.Sprintf("Performance metrics:\n%s", string(b)), nil
+			case "resource_timing":
+				entries, err := be.GetResourceTiming()
+				if err != nil {
+					return "", fmt.Errorf("resource timing: %w", err)
+				}
+				b, _ := json.MarshalIndent(entries, "", "  ")
+				return fmt.Sprintf("Resource timings (%d):\n%s", len(entries), string(b)), nil
+			case "console":
+				logs, err := be.ConsoleLogs()
+				if err != nil {
+					return "", fmt.Errorf("console: %w", err)
+				}
+				return fmt.Sprintf("Console logs (%d):\n%s", len(logs), strings.Join(logs, "\n")), nil
+			case "new_tab":
+				page, err := be.NewTab()
+				if err != nil {
+					return "", fmt.Errorf("new tab: %w", err)
+				}
+				info, _ := page.Info()
+				url := ""
+				if info != nil {
+					url = info.URL
+				}
+				return fmt.Sprintf("New tab created: %s", url), nil
+			case "switch_tab":
+				idx := 0
+				fmt.Sscanf(p.Value, "%d", &idx)
+				if err := be.SwitchTab(idx); err != nil {
+					return "", fmt.Errorf("switch tab: %w", err)
+				}
+				return fmt.Sprintf("Switched to tab %d", idx), nil
+			case "close_tab":
+				idx := 0
+				fmt.Sscanf(p.Value, "%d", &idx)
+				if err := be.CloseTab(idx); err != nil {
+					return "", fmt.Errorf("close tab: %w", err)
+				}
+				return fmt.Sprintf("Closed tab %d", idx), nil
+			case "tab_list":
+				tabs := be.TabList()
+				b, _ := json.MarshalIndent(tabs, "", "  ")
+				return fmt.Sprintf("Tabs (%d):\n%s", len(tabs), string(b)), nil
+			case "broadcast":
+				results, err := be.Broadcast(p.Value)
+				if err != nil {
+					return "", fmt.Errorf("broadcast: %w", err)
+				}
+				b, _ := json.Marshal(results)
+				return fmt.Sprintf("Broadcast results: %s", string(b)), nil
+			case "wait_selector":
+				timeout := 10
+				if p.Value != "" {
+					fmt.Sscanf(p.Value, "%d", &timeout)
+				}
+				if err := be.WaitForSelector(p.Selector, time.Duration(timeout)*time.Second); err != nil {
+					return "", fmt.Errorf("wait: %w", err)
+				}
+				return fmt.Sprintf("Selector '%s' appeared", p.Selector), nil
 			default:
 				return "", fmt.Errorf("unknown browser action: %s", p.Action)
 			}

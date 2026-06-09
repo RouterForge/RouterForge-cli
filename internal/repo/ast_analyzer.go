@@ -167,8 +167,8 @@ func (a *ASTAnalyzer) AnalyzeGoRepo(root string) ([]*PackageInfo, *DepGraph, err
 			return nil
 		}
 
-		pkg, err := a.AnalyzeGoPackage(path)
-		if err != nil {
+		pkg, pkgErr := a.AnalyzeGoPackage(path)
+		if pkgErr != nil {
 			return nil
 		}
 		pkgs = append(pkgs, pkg)
@@ -247,6 +247,9 @@ func (g *DepGraph) Markdown() string {
 
 func isVendorOrHidden(path string) bool {
 	base := filepath.Base(path)
+	if base == "." || base == ".." {
+		return false
+	}
 	return base == "vendor" || base == "node_modules" || strings.HasPrefix(base, ".")
 }
 

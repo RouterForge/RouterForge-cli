@@ -58,10 +58,11 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) Schedule(agentID, role string, fn func(ctx context.Context) (string, error)) (*AgentProcess, error) {
 	s.mu.Lock()
-	if !s.running {
+	running := s.running
+	s.mu.Unlock()
+	if !running {
 		s.Start()
 	}
-	s.mu.Unlock()
 
 	proc := &AgentProcess{
 		AgentID:   agentID,

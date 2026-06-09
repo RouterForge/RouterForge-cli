@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.5.0] — 2026-06-09
+
+### Added (Repository Intelligence V2 — Semantic Code Model Foundation)
+
+#### Semantic Code Model (pkg/models/codebase.go)
+- **Codebase**: Language-agnostic top-level semantic model — single source of truth for all future systems
+- **Package/Type/Function/Interface/Field/Import/CallSite**: Connected object graph with bidirectional references, JSON-serializable, every entity carries `Location{File, Line}` for full source traceability
+- **DepGraph/CallGraph/ArchProfile/Capability**: First-class model types for dependency analysis, function-level call tracking, architecture classification, and capability extraction
+
+#### Unified Go Parser (internal/repo/unified_analyzer.go)
+- **AnalyzeToCodebase(root)**: Single-pass analysis — one directory walk, each file parsed once, produces complete Codebase
+- Call sites extracted from both `pkg.Func()` selector calls and direct `func()` calls
+- Interface implementor resolution via method name matching
+- Proper type expression formatting (handles `*ast.StarExpr`, `SelectorExpr`, `ArrayType`, `MapType`, `FuncType`, `ChanType`, `Ellipsis`, `InterfaceType`)
+- Graceful test package skipping, vendor/hidden directory filtering
+
+#### Architecture Fingerprinting v2 (internal/repo/arch_v2.go)
+- **code-relationship-based architecture detection**: Analyzes import direction between layers, layer isolation, dependency inversion, interface implementations
+- Evidence-based scoring: layered (handler→service→repo), hexagonal (port interfaces + adapter imports), DDD (domain isolation + infrastructure depends on domain), MVC
+- Layer violation detection (e.g., handler→repo bypassing service)
+- Replaces directory-name heuristics with actual code structure analysis
+
+#### Capability Extraction with Traceability
+- 20+ capability detectors: http_server, database, serialization, message_queue, observability, authentication, configuration, cli_framework, graphql, has_tests, http_handler, runnable_service, cli_entrypoint, request_handler, middleware, database_migrations, json_models, testing_framework
+- Every capability carries `[]Location` — traceable to specific file and line
+
+#### Fusion Engine V2 Integration
+- **DeepStudyCodebase(path)**: Single-call entry point returning the complete `*models.Codebase`
+- Surface-level scan supplements AST-derived capabilities with basic source locations
+
+#### Real-world Validation
+- Analyzes RouterForge itself without reading the README: 14 packages, 25K+ LOC, 538 call-graph nodes, 4,415 edges, 50 dep-graph nodes, 9 capabilities with traceable source locations
+
+#### Tests
+- 9 new tests in internal/repo (analyzer, imports, capabilities, architecture, call graph, JSON, struct fields, interface implementors, real-world)
+- 2 new tests in internal/fusion (DeepStudyCodebase, capabilities + architecture end-to-end)
+- Full module test suite: 50+ tests, go vet clean, all packages compile
+
+### Fixed
+- **Deadlock in Scheduler.Schedule()**: Called `Start()` while holding internal mutex — deadlocked on recursive lock attempt. Fixed by releasing mutex before calling Start().
+- **Receiver type formatting**: `fmt.Sprintf("%s", ast.Node)` on `*ast.StarExpr` produced Go struct representation (`{%!s(token.Pos=177) UserHandler}`). Fixed by using `typeExprToString()` helper for clean `*TypeName` output.
+
 ## [1.4.0] — 2026-06-09
 
 ### Added (Roadmap Phase A: Repository Intelligence v2)

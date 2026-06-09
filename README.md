@@ -74,9 +74,14 @@ routerforge build --profile quick
 routerforge build --profile full
 ```
 
-### Repository Intelligence
+### Repository Intelligence V2
+
+Repository Intelligence V2 introduces a unified **Semantic Code Model** — a language-agnostic, traceable, serializable representation of codebase structure. Every extracted capability, type, function, and dependency is traceable back to its source file and line.
 
 ```bash
+# Deep study — single-pass analysis returning full semantic model
+routerforge analyze fusion deep /path/to/repo
+
 # Clone a repo for analysis
 routerforge analyze clone https://github.com/user/repo.git
 
@@ -89,11 +94,17 @@ routerforge analyze ast /path/to/go/repo
 # Detect with AST-powered capability extraction
 routerforge analyze detect --ast /path/to/go/repo
 
-# Function-level call graph (Go) — tracks pkg.func → pkg.func calls
+# Function-level call graph + import graph (Go)
 routerforge analyze callgraph /path/to/go/repo
 
 # Architecture fingerprinting (Go) — detects layered / hexagonal / MVC / DDD
 routerforge analyze arch /path/to/go/repo
+
+# Architecture documentation generator with Mermaid diagrams
+routerforge analyze archgen /path/to/repo
+
+# Service map generation
+routerforge analyze servicemap /path/to/repo
 
 # Build capability matrix
 routerforge analyze matrix
@@ -168,25 +179,41 @@ routerforge build --profile quick --tui
 ## Architecture
 
 ```
-                   ┌─────────────┐
-                   │ Head Manager │
-                   └──────┬──────┘
-                          │
-           ┌──────────────┼──────────────┐
-           │              │              │
-    ┌──────▼─────┐ ┌─────▼──────┐ ┌─────▼──────┐
-    │ Team Mgr   │ │ Team Mgr   │ │ Team Mgr   │
-    │ (Frontend) │ │ (Backend)  │ │ (Security) │
-    └──────┬─────┘ └─────┬──────┘ └─────┬──────┘
-           │             │              │
-    ┌──────▼─────┐ ┌─────▼──────┐ ┌─────▼──────┐
-    │ MicroAgent │ │ MicroAgent │ │ MicroAgent │
-    │ Component  │ │ API        │ │ Security   │
-    │ Builder    │ │ Designer   │ │ Reviewer   │
-    └────────────┘ └────────────┘ └────────────┘
+                   ┌──────────────────────────┐
+                   │     Semantic Code Model    │
+                   │  (Codebase — single truth) │
+                   └──────────┬───────────────┘
+                              │ feeds
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+   ┌──────▼──────┐   ┌───────▼───────┐   ┌───────▼───────┐
+   │ Repository   │   │ Architecture  │   │  Capability    │
+   │ Intelligence │   │ Generator     │   │  Extraction    │
+   │ (Analyze)    │   │ (Plan/Design) │   │  (Fusion)      │
+   └──────┬───────┘   └───────┬───────┘   └───────┬───────┘
+          │                   │                   │
+          └───────────────────┼───────────────────┘
+                              │
+                   ┌──────────▼──────────┐
+                   │    Head Manager      │
+                   │  (Orchestrator)      │
+                   └──────────┬──────────┘
+                              │
+            ┌─────────────────┼─────────────────┐
+            │                 │                  │
+     ┌──────▼─────┐   ┌──────▼──────┐   ┌──────▼──────┐
+     │ Team Mgr   │   │  Team Mgr   │   │  Team Mgr   │
+     │ (Frontend) │   │  (Backend)  │   │  (Security) │
+     └──────┬─────┘   └──────┬──────┘   └──────┬──────┘
+            │                │                  │
+     ┌──────▼─────┐   ┌──────▼──────┐   ┌──────▼──────┐
+     │ MicroAgent │   │  MicroAgent │   │  MicroAgent │
+     │ Component  │   │  API        │   │  Security   │
+     │ Builder    │   │  Designer   │   │  Reviewer   │
+     └────────────┘   └─────────────┘   └─────────────┘
 ```
 
-**Operating Flow**: `Idle → Understand → Design (LLM-generated) → Execute → Review`
+**Operating Flow**: `Idle → Understand (from Codebase) → Design → Execute → Review`
 
 ## Features
 
@@ -198,7 +225,7 @@ routerforge build --profile quick --tui
 - **Memory System**: In-memory store with context compression, checkpoint/restore, and scope-based access policies (read/write/admin levels with wildcard matching)
 - **Token Budget Tracking**: Per-agent, per-phase, and global token limits with automatic 90% usage warnings and hard caps
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
-- **Repository Intelligence**: AST-based analysis (packages, functions, types, interfaces, dependency graphs), function-level call graphs, and architecture fingerprinting (layered, hexagonal, MVC, DDD)
+- **Repository Intelligence V2**: Unified Semantic Code Model (`Codebase`) with single-pass Go parsing, dependency graph, call graph (selector + direct calls), architecture fingerprinting from code relationships (import direction, layer isolation, DIP detection), capability extraction with full source traceability, and JSON serialization
 - **Pipeline Profiles**: Configurable build profiles (quick, full)
 - **Traceable Artifacts**: Every build generates plan.json, trace.jsonl, and summary.json for full auditability
 - **Browser Session Management**: Pooled headless Chromium sessions with acquire/release/eviction lifecycle
@@ -230,7 +257,7 @@ make lint
 make fmt
 ```
 
-All packages compile clean, `go vet` passes, and 39+ tests pass across 11 test packages.
+All packages compile clean, `go vet` passes, and 50+ tests pass across 12 test packages.
 
 ## Tech Stack
 
