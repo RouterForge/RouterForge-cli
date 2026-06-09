@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
+	"github.com/routerforge/cli/internal/fusion"
 	"github.com/routerforge/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
@@ -286,6 +287,64 @@ var archCmd = &cobra.Command{
 	},
 }
 
+var fusionCmd = &cobra.Command{
+	Use:   "fusion",
+	Short: "Capability Fusion Engine",
+	Long:  `Analyze and build a capability fusion graph from repositories and known tools.`,
+}
+
+var fusionGraphCmd = &cobra.Command{
+	Use:   "graph",
+	Short: "Display the capability fusion graph",
+	Run: func(cmd *cobra.Command, args []string) {
+		fe := fusion.NewEngine()
+		pterm.DefaultSection.Println("Capability Fusion Graph")
+		fmt.Println(fe.Markdown())
+	},
+}
+
+var fusionStudyCmd = &cobra.Command{
+	Use:   "study <path>",
+	Short: "Study a local repository for capabilities",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := args[0]
+		fe := fusion.NewEngine()
+		caps, err := fe.StudyRepo(path)
+		if err != nil {
+			pterm.Error.Printfln("Study failed: %v", err)
+			return
+		}
+		pterm.DefaultSection.Printfln("Discovered %d capabilities", len(caps))
+		for _, c := range caps {
+			pterm.Printfln("  • %s — %s (source: %s)", c.Name, c.Description, c.Source)
+			for _, p := range c.Patterns {
+				pterm.Printfln("    └ %s", p)
+			}
+		}
+	},
+}
+
+var fusionRemoteCmd = &cobra.Command{
+	Use:   "remote <url>",
+	Short: "Study a remote repository for capabilities",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		url := args[0]
+		fe := fusion.NewEngine()
+		pterm.Info.Printfln("Studying remote repo: %s", url)
+		caps, err := fe.StudyRemoteRepo(url)
+		if err != nil {
+			pterm.Error.Printfln("Study failed: %v", err)
+			return
+		}
+		pterm.DefaultSection.Printfln("Discovered %d capabilities", len(caps))
+		for _, c := range caps {
+			pterm.Printfln("  • %s — %s", c.Name, c.Description)
+		}
+	},
+}
+
 func init() {
 	analyzeCmd.AddCommand(cloneCmd)
 	analyzeCmd.AddCommand(detectCmd)
@@ -295,6 +354,10 @@ func init() {
 	analyzeCmd.AddCommand(astCmd)
 	analyzeCmd.AddCommand(callgraphCmd)
 	analyzeCmd.AddCommand(archCmd)
+	analyzeCmd.AddCommand(fusionCmd)
+	fusionCmd.AddCommand(fusionGraphCmd)
+	fusionCmd.AddCommand(fusionStudyCmd)
+	fusionCmd.AddCommand(fusionRemoteCmd)
 	detectCmd.Flags().BoolVar(&astFlag, "ast", false, "Use AST analysis for Go repos")
 	rootCmd.AddCommand(analyzeCmd)
 }

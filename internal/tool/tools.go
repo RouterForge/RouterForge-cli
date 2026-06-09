@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,6 +141,9 @@ func RegisterAll(r *Registry) {
 	registerSearch(r)
 	registerWebFetch(r)
 	registerAskUser(r)
+	registerWebSearch(r)
+	registerAPICall(r)
+	registerBrowserAction(r)
 }
 
 func registerShell(r *Registry) {
@@ -252,6 +256,77 @@ func registerAskUser(r *Registry) {
 			fmt.Scanln(&answer)
 			if answer == "" { answer = "no" }
 			return "User response: " + answer, nil
+		},
+	))
+}
+
+func registerWebSearch(r *Registry) {
+	r.Register(sk("web_search", "Search the web and return results",
+		json.RawMessage(`{"type":"object","properties":{"query":{"type":"string"},"count":{"type":"integer","default":5}},"required":["query"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p struct {
+				Query string `json:"query"`
+				Count int    `json:"count"`
+			}
+			json.Unmarshal(raw, &p)
+			if p.Count <= 0 { p.Count = 5 }
+
+			req, _ := http.NewRequestWithContext(ctx, "GET",
+				fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1", url.QueryEscape(p.Query)), nil)
+			req.Header.Set("User-Agent", "RouterForge/1.0")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return "", fmt.Errorf("search failed: %w", err)
+			}
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+			return fmt.Sprintf("Search results for '%s':\n%s", p.Query, string(body)), nil
+		},
+	))
+}
+
+func registerAPICall(r *Registry) {
+	r.Register(sk("api_call", "Make an HTTP API request to an external service",
+		json.RawMessage(`{"type":"object","properties":{"url":{"type":"string"},"method":{"type":"string","default":"GET"},"headers":{"type":"object","default":{}},"body":{"type":"string","default":""}},"required":["url"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			var p struct {
+				URL     string            `json:"url"`
+				Method  string            `json:"method"`
+				Headers map[string]string `json:"headers"`
+				Body    string            `json:"body"`
+			}
+			json.Unmarshal(raw, &p)
+			if p.Method == "" { p.Method = "GET" }
+
+			var reqBody io.Reader
+			if p.Body != "" {
+				reqBody = strings.NewReader(p.Body)
+			}
+			req, err := http.NewRequestWithContext(ctx, p.Method, p.URL, reqBody)
+			if err != nil {
+				return "", fmt.Errorf("request failed: %w", err)
+			}
+			for k, v := range p.Headers {
+				req.Header.Set(k, v)
+			}
+			req.Header.Set("User-Agent", "RouterForge/1.0")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return "", fmt.Errorf("api call failed: %w", err)
+			}
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+			return fmt.Sprintf("HTTP %d\n\n%s", resp.StatusCode, string(body)), nil
+		},
+	))
+}
+
+func registerBrowserAction(r *Registry) {
+	r.Register(sk("browser_action", "Control a headless browser (navigate, click, type, screenshot)",
+		json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["navigate","click","type","screenshot","html"]},"value":{"type":"string"},"selector":{"type":"string","default":""}},"required":["action","value"]}`),
+		func(ctx context.Context, raw json.RawMessage) (string, error) {
+			return "Browser action requires `routerforge browser` command. Use `routerforge browser <action> <value>` instead.", nil
 		},
 	))
 }

@@ -28,16 +28,26 @@ type LogEntry struct {
 }
 
 type Model struct {
-	mu      sync.RWMutex
-	phase   string
-	phases  []PhaseStatus
-	agents  []AgentStatus
-	logs    []LogEntry
-	width   int
-	height  int
-	ready   bool
-	quitting bool
-	err     error
+	mu        sync.RWMutex
+	phase     string
+	lifecycle string
+	phases    []PhaseStatus
+	agents    []AgentStatus
+	logs      []LogEntry
+	width     int
+	height    int
+	ready     bool
+	quitting  bool
+	err       error
+	cost      float64
+	tokens    int
+	tasks     []TaskStatus
+}
+
+type TaskStatus struct {
+	ID     string
+	Desc   string
+	Status string
 }
 
 var (
@@ -107,6 +117,36 @@ func (m *Model) SetPhase(p string) {
 	}
 }
 
+func (m *Model) SetLifecycle(l string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lifecycle = l
+}
+
+func (m *Model) SetCost(cost float64, tokens int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cost = cost
+	m.tokens = tokens
+}
+
+func (m *Model) AddTask(id, desc, status string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.tasks = append(m.tasks, TaskStatus{ID: id, Desc: desc, Status: status})
+}
+
+func (m *Model) UpdateTask(id, status string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range m.tasks {
+		if m.tasks[i].ID == id {
+			m.tasks[i].Status = status
+			return
+		}
+	}
+}
+
 func (m *Model) AddAgent(id, role, status string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -163,6 +203,9 @@ func (m *Model) View() string {
 
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(" RouterForge "))
+	if m.lifecycle != "" {
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Padding(0, 1).Render("[" + m.lifecycle + "]"))
+	}
 	b.WriteString("\n\n")
 
 	b.WriteString(renderPhases(m.phases))
@@ -171,8 +214,16 @@ func (m *Model) View() string {
 	b.WriteString(renderAgents(m.agents))
 	b.WriteString("\n")
 
+	b.WriteString(renderTasks(m.tasks))
+	b.WriteString("\n")
+
 	b.WriteString(renderLogs(m.logs, m.width))
 	b.WriteString("\n")
+
+	costStr := fmt.Sprintf(" $%.4f ", m.cost)
+	tokStr := fmt.Sprintf(" %d tokens ", m.tokens)
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Render(costStr))
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(tokStr))
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(" q:quit "))
 
 	return b.String()
@@ -212,6 +263,36 @@ func renderAgents(agents []AgentStatus) string {
 			s = fmt.Sprintf("  ○ %s (%s)", a.Role, a.Status)
 		}
 		lines = append(lines, s)
+	}
+	return borderStyle.Render(strings.Join(lines, "\n"))
+}
+
+func renderTasks(tasks []TaskStatus) string {
+	if len(tasks) == 0 {
+		return ""
+	}
+	var lines []string
+	lines = append(lines, " Tasks:")
+	count := 0
+	for _, t := range tasks {
+		if count >= 5 {
+			break
+		}
+		status := "○"
+		switch t.Status {
+		case "completed", "done":
+			status = "✅"
+		case "failed":
+			status = "❌"
+		case "in_progress", "active":
+			status = "▶"
+		}
+		desc := t.Desc
+		if len(desc) > 40 {
+			desc = desc[:37] + "..."
+		}
+		lines = append(lines, fmt.Sprintf("  %s %s", status, desc))
+		count++
 	}
 	return borderStyle.Render(strings.Join(lines, "\n"))
 }

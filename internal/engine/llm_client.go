@@ -27,15 +27,17 @@ type ToolCall struct {
 }
 
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens     int     `json:"prompt_tokens"`
+	CompletionTokens int     `json:"completion_tokens"`
+	TotalTokens      int     `json:"total_tokens"`
+	Cost             float64 `json:"cost"`
 }
 
 func (u *Usage) Add(other Usage) {
 	u.PromptTokens += other.PromptTokens
 	u.CompletionTokens += other.CompletionTokens
 	u.TotalTokens += other.TotalTokens
+	u.Cost += other.Cost
 }
 
 type LLMResponse struct {
@@ -44,10 +46,15 @@ type LLMResponse struct {
 	Usage     Usage      `json:"usage"`
 }
 
+type CostCallback func(model, agentID, phase string, usage Usage)
+
 type LLMClient struct {
-	BaseURL string
-	Model   string
-	Client  *http.Client
+	BaseURL     string
+	Model       string
+	Client      *http.Client
+	CostHandler CostCallback
+	AgentID     string
+	Phase       string
 }
 
 func NewLLMClient(model string) *LLMClient {
@@ -88,6 +95,12 @@ func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"usage"`
+		Cost string `json:"cost"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return "", fmt.Errorf("parse: %w", err)
@@ -95,6 +108,20 @@ func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
 	if len(result.Choices) == 0 {
 		return "", fmt.Errorf("no choices")
 	}
+
+	if c.CostHandler != nil {
+		cost := 0.0
+		if result.Cost != "" {
+			fmt.Sscanf(result.Cost, "%f", &cost)
+		}
+		c.CostHandler(c.Model, c.AgentID, c.Phase, Usage{
+			PromptTokens:     result.Usage.PromptTokens,
+			CompletionTokens: result.Usage.CompletionTokens,
+			TotalTokens:      result.Usage.TotalTokens,
+			Cost:             cost,
+		})
+	}
+
 	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 

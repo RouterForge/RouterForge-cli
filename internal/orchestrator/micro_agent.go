@@ -32,10 +32,11 @@ type AgentEvent struct {
 }
 
 type Context struct {
-	Project *models.Project
-	Model   string
-	Data    map[string]string
-	Memory  memory.Store
+	Project     *models.Project
+	Model       string
+	Data        map[string]string
+	Memory      memory.Store
+	CostHandler engine.CostCallback
 }
 
 func NewMicroAgent(agent *models.Agent, ctx *Context) *MicroAgent {
@@ -201,6 +202,9 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 	}
 
 	llm := engine.NewLLMClient(c.Model)
+	llm.AgentID = tr.agentID
+	llm.Phase = "execute"
+	llm.CostHandler = c.CostHandler
 
 	artifactsDir := filepath.Join(".", ".routerforge", "artifacts")
 	os.MkdirAll(artifactsDir, 0755)

@@ -19,23 +19,26 @@ import (
 )
 
 type HeadManager struct {
-	project      *models.Project
-	stateMachine *StateMachine
-	teams        map[string]*TeamManager
-	decisions    []models.Decision
-	messages     []models.AgentMessage
-	model        string
-	userProxy    agent.UserInputProvider
-	bus          event.Bus
-	mem          memory.Store
-	plan         *models.Plan
-	tracePath    string
-	tokenBudget  *TokenBudget
-	tokenTracker *TokenTracker
-	memPolicy    *MemoryPolicy
-	memEnforcer  *MemoryPolicyEnforcer
-	sandbox      *ToolSandbox
-	spawner      *engine.AgentSpawner
+	project           *models.Project
+	stateMachine      *StateMachine
+	lifecycleMachine  *LifecycleStateMachine
+	teams             map[string]*TeamManager
+	decisions         []models.Decision
+	messages          []models.AgentMessage
+	model             string
+	userProxy         agent.UserInputProvider
+	bus               event.Bus
+	mem               memory.Store
+	plan              *models.Plan
+	tracePath         string
+	tokenBudget       *TokenBudget
+	tokenTracker      *TokenTracker
+	costTracker       *CostTracker
+	reviewGates       *ReviewGateManager
+	memPolicy         *MemoryPolicy
+	memEnforcer       *MemoryPolicyEnforcer
+	sandbox           *ToolSandbox
+	spawner           *engine.AgentSpawner
 }
 
 func NewHeadManager(model string) *HeadManager {
@@ -45,25 +48,29 @@ func NewHeadManager(model string) *HeadManager {
 	sp := NewSandboxPolicy()
 	return &HeadManager{
 		project: &models.Project{
-			ID:        id,
-			Phase:     models.PhaseIdle,
-			Model:     model,
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:             id,
+			Phase:          models.PhaseIdle,
+			LifecyclePhase: models.LifecycleDemo,
+			Model:          model,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		},
-		stateMachine: NewStateMachine(),
-		teams:        make(map[string]*TeamManager),
-		decisions:    []models.Decision{},
-		messages:     []models.AgentMessage{},
-		model:        model,
-		userProxy:    agent.NewTerminalUserProxy(),
-		bus:          event.NewBus(),
-		tokenBudget:  NewTokenBudget(100000),
-		tokenTracker: NewTokenTracker(),
-		memPolicy:    mp,
-		memEnforcer:  NewMemoryPolicyEnforcer(mp),
-		sandbox:      NewToolSandbox(sp),
-		spawner:      engine.NewAgentSpawner(model),
+		stateMachine:     NewStateMachine(),
+		lifecycleMachine: NewLifecycleStateMachine(),
+		teams:            make(map[string]*TeamManager),
+		decisions:        []models.Decision{},
+		messages:         []models.AgentMessage{},
+		model:            model,
+		userProxy:        agent.NewTerminalUserProxy(),
+		bus:              event.NewBus(),
+		tokenBudget:      NewTokenBudget(100000),
+		tokenTracker:     NewTokenTracker(),
+		costTracker:      NewCostTracker(),
+		reviewGates:      NewReviewGateManager(),
+		memPolicy:        mp,
+		memEnforcer:      NewMemoryPolicyEnforcer(mp),
+		sandbox:          NewToolSandbox(sp),
+		spawner:          engine.NewAgentSpawner(model),
 	}
 }
 
@@ -163,20 +170,16 @@ func (hm *HeadManager) Understand() error {
 
 func (hm *HeadManager) askModelChoice() string {
 	pterm.Info.Println("❓ Choose an AI model for your agents:")
-	pterm.Println("Available free models:")
-	pterm.Println("  1) big-pickle         (default, recommended)")
+	pterm.Println("Available free models (tested working):")
+	pterm.Println("  1) big-pickle              (default, recommended)")
 	pterm.Println("  2) deepseek-v4-flash-free")
-	pterm.Println("  3) qwen3.6-plus-free")
-	pterm.Println("  4) mimo-v2.5-free")
-	pterm.Println("  5) minimax-m3-free")
-	pterm.Println("  6) nemotron-3-super-free")
-	pterm.Println("  7) nemotron-3-ultra-free")
+	pterm.Println("  3) mimo-v2.5-free")
+	pterm.Println("  4) nemotron-3-super-free")
+	pterm.Println("  5) nemotron-3-ultra-free")
 	modelOpts := []string{
 		"big-pickle",
 		"deepseek-v4-flash-free",
-		"qwen3.6-plus-free",
 		"mimo-v2.5-free",
-		"minimax-m3-free",
 		"nemotron-3-super-free",
 		"nemotron-3-ultra-free",
 	}
@@ -386,6 +389,9 @@ func (hm *HeadManager) CreateTeam(domain string) (*TeamManager, error) {
 		Model:   hm.model,
 		Data:    make(map[string]string),
 		Memory:  hm.mem,
+		CostHandler: func(model, agentID, phase string, usage engine.Usage) {
+			hm.costTracker.Track(model, agentID, phase, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, usage.Cost)
+		},
 	}
 
 	tm := NewTeamManager(agent, ctx)
@@ -461,6 +467,43 @@ func (hm *HeadManager) Review() error {
 	hm.WriteTrace("phase_end", "head_manager", "review", "", "completed", "review complete")
 	pterm.Success.Println("Review phase complete. All agents accounted for.")
 	return nil
+}
+
+func (hm *HeadManager) LifecyclePhase() LifecyclePhase    { return hm.lifecycleMachine.Current() }
+func (hm *HeadManager) LifecycleStr() string              { return hm.lifecycleMachine.CurrentStr() }
+func (hm *HeadManager) CostTracker() *CostTracker         { return hm.costTracker }
+func (hm *HeadManager) ReviewGates() *ReviewGateManager   { return hm.reviewGates }
+func (hm *HeadManager) CanAdvanceLifecycle() bool         { return hm.reviewGates.AllRequiredPassed() }
+
+func (hm *HeadManager) AdvanceLifecycle() error {
+	if !hm.CanAdvanceLifecycle() {
+		failed := hm.reviewGates.GetFailedRequired()
+		return fmt.Errorf("cannot advance lifecycle: %d required gates not passed: %v", len(failed), failed)
+	}
+	next := hm.lifecycleMachine.Current() + 1
+	if next > LifecycleProduction {
+		return fmt.Errorf("already at final lifecycle phase")
+	}
+	approvals := []string{"head_manager"}
+	err := hm.lifecycleMachine.Transition(next, "Advancing lifecycle phase", approvals)
+	if err != nil {
+		return err
+	}
+	hm.project.LifecyclePhase = next.ToModel()
+	hm.project.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	hm.WriteTrace("lifecycle_advance", "head_manager", hm.lifecycleMachine.CurrentStr(), "", "completed",
+		fmt.Sprintf("Advanced to %s phase. Deliverable: %s", hm.lifecycleMachine.CurrentStr(), models.LifecycleDeliverable(next.ToModel())))
+	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
+		Source:  "head_manager",
+		Payload: map[string]string{"phase": hm.lifecycleMachine.CurrentStr(), "type": "lifecycle"},
+	})
+	return nil
+}
+
+func (hm *HeadManager) ApproveGate(gateType GateType, approvedBy, notes string) {
+	hm.reviewGates.SetGatePassed(gateType, approvedBy, notes)
+	hm.WriteTrace("gate_approved", approvedBy, hm.lifecycleMachine.CurrentStr(), "", "approved",
+		fmt.Sprintf("Gate %s approved by %s", gateType, approvedBy))
 }
 
 func (hm *HeadManager) logDecision(action, payload string) {

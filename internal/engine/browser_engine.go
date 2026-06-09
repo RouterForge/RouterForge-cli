@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 type BrowserEngine struct {
 	browser       *rod.Browser
 	page          *rod.Page
+	pages         []*rod.Page
 	screenshotDir string
 }
 
@@ -135,4 +137,102 @@ func (be *BrowserEngine) Close() {
 
 func (be *BrowserEngine) Page() *rod.Page {
 	return be.page
+}
+
+func (be *BrowserEngine) GetCookies() ([]*proto.NetworkCookie, error) {
+	if be.page == nil {
+		return nil, fmt.Errorf("browser not launched")
+	}
+	cookies, err := be.page.Cookies(nil)
+	if err != nil {
+		return nil, fmt.Errorf("get cookies: %w", err)
+	}
+	return cookies, nil
+}
+
+func (be *BrowserEngine) SetCookie(name, value, domain, path string) error {
+	if be.page == nil {
+		return fmt.Errorf("browser not launched")
+	}
+	cookie := &proto.NetworkCookieParam{
+		Name:   name,
+		Value:  value,
+		Domain: domain,
+		Path:   path,
+	}
+	return be.page.SetCookies([]*proto.NetworkCookieParam{cookie})
+}
+
+func (be *BrowserEngine) ClearCookies() error {
+	if be.page == nil {
+		return fmt.Errorf("browser not launched")
+	}
+	return be.page.SetCookies([]*proto.NetworkCookieParam{})
+}
+
+func (be *BrowserEngine) ConsoleLogs() ([]string, error) {
+	if be.page == nil {
+		return nil, fmt.Errorf("browser not launched")
+	}
+	var logs []string
+	be.page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
+		for _, arg := range e.Args {
+			logs = append(logs, arg.Value.String())
+		}
+	})()
+	return logs, nil
+}
+
+func (be *BrowserEngine) NewTab() (*rod.Page, error) {
+	if be.browser == nil {
+		return nil, fmt.Errorf("browser not launched")
+	}
+	page, err := be.browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		return nil, fmt.Errorf("new tab: %w", err)
+	}
+	be.pages = append(be.pages, page)
+	be.page = page
+	return page, nil
+}
+
+func (be *BrowserEngine) SwitchTab(index int) error {
+	if index < 0 || index >= len(be.pages) {
+		return fmt.Errorf("tab index %d out of range (0-%d)", index, len(be.pages)-1)
+	}
+	be.page = be.pages[index]
+	return nil
+}
+
+func (be *BrowserEngine) CloseTab(index int) error {
+	if index < 0 || index >= len(be.pages) {
+		return fmt.Errorf("tab index %d out of range", index)
+	}
+	page := be.pages[index]
+	if err := page.Close(); err != nil {
+		return err
+	}
+	be.pages = append(be.pages[:index], be.pages[index+1:]...)
+	if len(be.pages) > 0 && index < len(be.pages) {
+		be.page = be.pages[index]
+	} else if len(be.pages) > 0 {
+		be.page = be.pages[0]
+	} else {
+		be.page = nil
+	}
+	return nil
+}
+
+func (be *BrowserEngine) TabCount() int {
+	return len(be.pages)
+}
+
+func (be *BrowserEngine) WaitForSelector(selector string, timeout time.Duration) error {
+	if be.page == nil {
+		return fmt.Errorf("browser not launched")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := be.page.Context(ctx).Element(selector)
+	return err
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -188,4 +189,50 @@ func (s *BrowserSession) Type(selector, text string) error {
 		return err
 	}
 	return el.Input(text)
+}
+
+func (s *BrowserSession) GetCookies() ([]*proto.NetworkCookie, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	return s.Page.Cookies(nil)
+}
+
+func (s *BrowserSession) SetCookie(name, value, domain, path string) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	return s.Page.SetCookies([]*proto.NetworkCookieParam{{
+		Name: name, Value: value, Domain: domain, Path: path,
+	}})
+}
+
+func (s *BrowserSession) ClearCookies() error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	return s.Page.SetCookies([]*proto.NetworkCookieParam{})
+}
+
+func (s *BrowserSession) ConsoleLogs() ([]string, error) {
+	if s.Page == nil {
+		return nil, fmt.Errorf("no page in session")
+	}
+	var logs []string
+	s.Page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
+		for _, arg := range e.Args {
+			logs = append(logs, arg.Value.String())
+		}
+	})()
+	return logs, nil
+}
+
+func (s *BrowserSession) WaitForSelector(selector string, timeout time.Duration) error {
+	if s.Page == nil {
+		return fmt.Errorf("no page in session")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := s.Page.Context(ctx).Element(selector)
+	return err
 }

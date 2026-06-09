@@ -32,6 +32,21 @@ var serveCmd = &cobra.Command{
 			return
 		}
 
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":"ok","version":"1.3.0","service":"routerforge"}`))
+		})
+
+		http.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := os.Stat(artifactDir); os.IsNotExist(err) {
+				w.WriteHeader(503)
+				w.Write([]byte(`{"status":"not_ready","reason":"no artifacts"}`))
+				return
+			}
+			w.Write([]byte(`{"status":"ready","artifacts":true}`))
+		})
+
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/" {
 				serveDashboard(w, r, artifactDir)
