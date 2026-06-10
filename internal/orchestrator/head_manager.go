@@ -23,6 +23,7 @@ import (
 
 type HeadManager struct {
 	project           *models.Project
+	projectDir        string
 	stateMachine      *StateMachine
 	lifecycleMachine  *LifecycleStateMachine
 	teams             map[string]*TeamManager
@@ -339,7 +340,14 @@ func (hm *HeadManager) Design() error {
 
 	hm.plan = plan
 	hm.logDecision("plan", fmt.Sprintf("Generated plan with %d teams via LLM", len(plan.Teams)))
+	hm.applyPlan(plan)
 
+	pterm.Success.Printfln("Design complete — %d teams, %d agents created dynamically",
+		len(plan.Teams), countAgents(plan))
+	return nil
+}
+
+func (hm *HeadManager) applyPlan(plan *models.Plan) {
 	for _, pt := range plan.Teams {
 		tm, err := hm.CreateTeam(pt.Domain, pt.Model)
 		if err != nil {
@@ -366,10 +374,14 @@ func (hm *HeadManager) Design() error {
 			hm.sandbox.RegisterAgent(agent.ID)
 		}
 	}
+}
 
-	pterm.Success.Printfln("Design complete — %d teams, %d agents created dynamically",
-		len(plan.Teams), countAgents(plan))
-	return nil
+func (hm *HeadManager) RestorePlan(p *models.Plan) {
+	hm.plan = p
+	hm.logDecision("plan", fmt.Sprintf("Restored plan with %d teams from saved artifact", len(p.Teams)))
+	hm.applyPlan(p)
+	pterm.Success.Printfln("Plan restored — %d teams, %d agents ready",
+		len(p.Teams), countAgents(p))
 }
 
 func countAgents(p *models.Plan) int {
@@ -473,6 +485,7 @@ func (hm *HeadManager) ResourceManager() *ResourceManager { return hm.runtime.Re
 func (hm *HeadManager) MemoryPool() *MemoryPool { return hm.runtime.MemoryPool }
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
+func (hm *HeadManager) SetProjectDir(dir string) { hm.projectDir = dir }
 
 func (hm *HeadManager) WriteTrace(eventType, agentID, phase, taskID, status, detail string) {
 	if hm.tracePath == "" {
@@ -532,10 +545,11 @@ func (hm *HeadManager) CreateTeam(domain, model string) (*TeamManager, error) {
 	}
 
 	ctx := &Context{
-		Project: hm.project,
-		Model:   model,
-		Data:    make(map[string]string),
-		Memory:  hm.mem,
+		Project:    hm.project,
+		ProjectDir: hm.projectDir,
+		Model:      model,
+		Data:       make(map[string]string),
+		Memory:     hm.mem,
 		CostHandler: func(model, agentID, phase string, usage engine.Usage) {
 			hm.costTracker.Track(model, agentID, phase, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, usage.Cost)
 		},
@@ -596,24 +610,40 @@ func (hm *HeadManager) Review() error {
 
 	pterm.DefaultSection.Printfln("Review Phase — Checking Results")
 
+	totalTasks := 0
+	failedTasks := 0
+
 	for id, tm := range hm.teams {
 		reports := tm.CollectReports()
 		pterm.Info.Printfln("Team %s: %d agents completed", id, len(reports))
 		for _, r := range reports {
 			pterm.Printfln("  Agent: %s | Status: %s | Tasks: %d", r.Role, r.Status, r.TaskCount)
 			for _, t := range r.Tasks {
+				totalTasks++
 				status := "✅"
 				if t.Status != "completed" {
 					status = "❌"
+					failedTasks++
 				}
 				pterm.Printfln("    %s %s: %s", status, t.ID, t.Status)
 			}
 		}
 	}
 
-	hm.logDecision("review", "Review complete")
+	// Execution gates: fail if no tasks passed or >50% failures
+	if totalTasks == 0 {
+		pterm.Error.Println("REVIEW GATE FAILED: No tasks were executed — build produced no output")
+		return fmt.Errorf("review gate failed: no tasks executed")
+	}
+	failRate := float64(failedTasks) / float64(totalTasks)
+	if failRate > 0.5 {
+		pterm.Error.Printfln("REVIEW GATE FAILED: %.0f%% of tasks failed (%d/%d)", failRate*100, failedTasks, totalTasks)
+		return fmt.Errorf("review gate failed: %.0f%% task failure rate exceeds 50%% threshold", failRate*100)
+	}
+
+	hm.logDecision("review", fmt.Sprintf("Review complete: %d/%d tasks passed", totalTasks-failedTasks, totalTasks))
 	hm.WriteTrace("phase_end", "head_manager", "review", "", "completed", "review complete")
-	pterm.Success.Println("Review phase complete. All agents accounted for.")
+	pterm.Success.Printfln("Review phase complete. %d/%d tasks passed.", totalTasks-failedTasks, totalTasks)
 	return nil
 }
 

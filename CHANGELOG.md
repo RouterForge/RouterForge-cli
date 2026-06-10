@@ -1,6 +1,28 @@
 # Changelog
 
-## [1.7.0] — 2026-06-09
+## [1.7.1] — 2026-06-10
+
+### Fixed (Execution Reliability — Build produces real source files)
+
+#### Execution creates source files (internal/orchestrator/micro_agent.go)
+- `TaskRunner.Execute` now parses `FILE: <path>` prefix from LLM output and writes source files to the project directory at the correct relative path
+- Added `ProjectDir` field to `Context` — passed through from `HeadManager` to every agent
+- LLM system prompt instructs model to return `FILE: path/to/file.ext` format with file content
+- Fallback `inferFilename()` heuristic when LLM returns content without `FILE:` prefix
+
+#### Plan/build disconnect (cmd/build.go, internal/orchestrator/head_manager.go)
+- Extracted `applyPlan()` from `Design()` so it can be called independently
+- Added `RestorePlan()` to rebuild teams/agents from a saved `plan.json` without re-invoking the LLM
+- `build.go` loads `.routerforge/artifacts/plan.json` first; only calls `Design()` if no saved plan exists
+- Added `projectDir` field and `SetProjectDir()` to `HeadManager`
+
+#### Review gates detect failures (internal/orchestrator/head_manager.go)
+- `Review()` now counts total/failed tasks across all agents
+- Fails if 0 tasks were executed (build produced no output)
+- Fails if >50% of tasks failed (exceeds failure threshold)
+
+#### Models
+- Added `pkg/models` import to `cmd/build.go` for `models.Plan` deserialization
 
 ### Added (Deepening Go Analysis — Proven Understanding)
 

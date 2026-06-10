@@ -11,6 +11,7 @@ import (
 	"github.com/routerforge/cli/internal/orchestrator"
 	"github.com/routerforge/cli/internal/storage"
 	"github.com/routerforge/cli/internal/tui"
+	"github.com/routerforge/cli/pkg/models"
 	"github.com/spf13/cobra"
 )
 
@@ -63,6 +64,7 @@ var buildCmd = &cobra.Command{
 		hm := orchestrator.NewHeadManager(cfg.Model)
 		hm.SetMemory(memory.NewStore())
 		hm.SetTracePath(filepath.Join(routerDir, "artifacts", "trace.jsonl"))
+		hm.SetProjectDir(projectDir)
 
 		if tuiFlag {
 			p := tui.NewProgram(hm)
@@ -76,12 +78,26 @@ var buildCmd = &cobra.Command{
 		pterm.Info.Printfln("Building with model: %s", cfg.Model)
 		pterm.Info.Printfln("Profile: %s (teams: %v)", profile, teams)
 
-		pterm.Info.Println("Designing team structure from requirements...")
-		if err := hm.Design(); err != nil {
-			pterm.Warning.Printfln("Design fallback: %v", err)
-			pterm.Info.Println("Creating teams from profile config...")
-			for _, t := range teams {
-				hm.CreateTeam(t, "")
+		// Try loading saved plan first so builds reuse the same decomposition
+		planArtifact := filepath.Join(routerDir, "artifacts", "plan.json")
+		loadedSaved := false
+		if data, err := os.ReadFile(planArtifact); err == nil {
+			var savedPlan models.Plan
+			if err := json.Unmarshal(data, &savedPlan); err == nil && len(savedPlan.Teams) > 0 {
+				pterm.Info.Printfln("Loaded saved plan from %s", planArtifact)
+				hm.RestorePlan(&savedPlan)
+				loadedSaved = true
+			}
+		}
+
+		if !loadedSaved {
+			pterm.Info.Println("Designing team structure from requirements...")
+			if err := hm.Design(); err != nil {
+				pterm.Warning.Printfln("Design fallback: %v", err)
+				pterm.Info.Println("Creating teams from profile config...")
+				for _, t := range teams {
+					hm.CreateTeam(t, "")
+				}
 			}
 		}
 

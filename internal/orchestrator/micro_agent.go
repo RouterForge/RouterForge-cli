@@ -33,6 +33,7 @@ type AgentEvent struct {
 
 type Context struct {
 	Project     *models.Project
+	ProjectDir  string
 	Model       string
 	Data        map[string]string
 	Memory      memory.Store
@@ -206,8 +207,10 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 	llm.Phase = "execute"
 	llm.CostHandler = c.CostHandler
 
-	artifactsDir := filepath.Join(".", ".routerforge", "artifacts")
-	os.MkdirAll(artifactsDir, 0755)
+	projectDir := "."
+	if c.ProjectDir != "" {
+		projectDir = c.ProjectDir
+	}
 
 	ctxPrompt := tr.task.Description
 	if tr.mem != nil {
@@ -218,7 +221,23 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 		}
 	}
 
-	result, err := llm.Chat("You are a senior engineer. Generate production-quality code or documentation for the following task. Return ONLY the raw content, no markdown fences, no explanations.", ctxPrompt)
+	systemPrompt := fmt.Sprintf(`You are a senior engineer working on %s (%s).
+
+For each response, you MUST determine the correct file path for the output within the project directory.
+Return your response in this format:
+
+FILE: relative/path/to/file.ext
+---
+<file content here>
+
+Rules:
+- The path must be relative to the project root (e.g., main.go, internal/handler/routes.go)
+- Use standard project layout conventions for the tech stack
+- Return ONLY the FILE: section — no explanations, no markdown fences
+- If the task requires multiple files, return them one after another separated by newlines with FILE: prefix each`,
+		c.Project.Name, c.Project.Model)
+
+	result, err := llm.Chat(systemPrompt, ctxPrompt)
 	if err != nil {
 		statusCh <- AgentEvent{AgentID: c.Project.ID, Type: "task_failed", Error: err}
 		tr.task.Status = models.TaskFailed
@@ -232,17 +251,56 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 		return fmt.Errorf("LLM call failed: %w", err)
 	}
 
-	safeName := filepath.Base(tr.task.Description)
-	ext := ".md"
-	if strings.Contains(tr.task.Description, "HTML") || strings.Contains(tr.task.Description, "html") {
-		ext = ".html"
-	}
-	filename := filepath.Join(artifactsDir, safeName+ext)
-	if err := os.WriteFile(filename, []byte(result), 0644); err != nil {
-		return fmt.Errorf("write artifact: %w", err)
+	if result == "" {
+		return fmt.Errorf("empty response from LLM")
 	}
 
-	tr.task.Result = fmt.Sprintf("Generated artifact (%d bytes) via %s", len(result), c.Model)
+	filesWritten := 0
+	// Parse FILE: sections from the response
+	sections := strings.Split(result, "FILE:")
+	for _, section := range sections {
+		section = strings.TrimSpace(section)
+		if section == "" {
+			continue
+		}
+		// Extract filename (first line)
+		parts := strings.SplitN(section, "\n", 2)
+		fileName := strings.TrimSpace(parts[0])
+		// Strip --- separator if present
+		fileName = strings.TrimLeft(fileName, "- ")
+		fileName = strings.TrimSpace(fileName)
+		if fileName == "" {
+			continue
+		}
+
+		content := ""
+		if len(parts) > 1 {
+			content = strings.TrimSpace(parts[1])
+			// Strip leading --- separator
+			content = strings.TrimLeft(content, "- ")
+			content = strings.TrimSpace(content)
+		}
+
+		fullPath := filepath.Join(projectDir, fileName)
+		os.MkdirAll(filepath.Dir(fullPath), 0755)
+		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+			return fmt.Errorf("write %s: %w", fileName, err)
+		}
+		filesWritten++
+	}
+
+	// Fallback: if no FILE: sections were parsed, write entire output as a single file
+	if filesWritten == 0 {
+		fileName := inferFilename(tr.task.Description, c.Project.Name)
+		fullPath := filepath.Join(projectDir, fileName)
+		os.MkdirAll(filepath.Dir(fullPath), 0755)
+		if err := os.WriteFile(fullPath, []byte(result), 0644); err != nil {
+			return fmt.Errorf("write %s: %w", fileName, err)
+		}
+		filesWritten++
+	}
+
+	tr.task.Result = fmt.Sprintf("Wrote %d file(s) via %s", filesWritten, c.Model)
 
 	if tr.mem != nil {
 		tr.mem.Add(memory.Entry{
@@ -263,4 +321,29 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 		})
 	}
 	return nil
+}
+
+func inferFilename(taskDesc, projectName string) string {
+	taskLower := strings.ToLower(taskDesc)
+	switch {
+	case strings.Contains(taskLower, "go.mod") || strings.Contains(taskLower, "go module") || strings.Contains(taskLower, "module init"):
+		return "go.mod"
+	case strings.Contains(taskLower, "main.go") || strings.Contains(taskLower, "main file") || strings.Contains(taskLower, "entry point"):
+		return "main.go"
+	case strings.Contains(taskLower, "makefile") || strings.Contains(taskLower, "build file"):
+		return "Makefile"
+	case strings.Contains(taskLower, "dockerfile") || strings.Contains(taskLower, "docker file"):
+		return "Dockerfile"
+	case strings.Contains(taskLower, "readme") || strings.Contains(taskLower, "readme.md"):
+		return "README.md"
+	case strings.Contains(taskLower, "gitignore") || strings.Contains(taskLower, ".gitignore"):
+		return ".gitignore"
+	case strings.Contains(taskLower, "test") && strings.Contains(taskLower, "integration"):
+		return "integration_test.go"
+	case strings.Contains(taskLower, "test") || strings.Contains(taskLower, "_test"):
+		return fmt.Sprintf("%s_test.go", strings.ReplaceAll(strings.ToLower(projectName), " ", "_"))
+	default:
+		safe := strings.ReplaceAll(strings.ToLower(projectName), " ", "_")
+		return fmt.Sprintf("%s.go", safe)
+	}
 }
