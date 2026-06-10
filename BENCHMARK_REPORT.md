@@ -187,3 +187,12 @@ But execution is where it breaks:
   - Fails if 0 tasks executed (build produced no output)
   - Fails if >50% task failure rate
 - Fixes failure pattern #5 (false success reporting)
+
+### Fix 4: Repair Engine — closed execution loop (2026-06-10)
+- Added `RepairUntilValid()` — post-generation validation loop
+- After `Execute`, the build pipeline now runs:
+  `Validate → Detect Failure → Repair → Revalidate → Repeat` (up to retry budget)
+- Project type detection: Go (`go test ./...`), static web (asset reference check, `node --check`), Node (`npm build/test`), empty
+- Configurable via `--repair-retries` flag (default 2)
+- Review phase is now observational; validation is the success gate
+- Fixes the root cause of failure patterns #1/#2/#4 — generated output that doesn't build or run is repaired before success is reported

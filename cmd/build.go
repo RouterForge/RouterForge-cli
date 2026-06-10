@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	profileFlag string
-	tuiFlag     bool
+	profileFlag       string
+	tuiFlag           bool
+	repairRetriesFlag int
 )
 
 var buildCmd = &cobra.Command{
@@ -107,6 +108,11 @@ var buildCmd = &cobra.Command{
 			return
 		}
 
+		if err := hm.RepairUntilValid(repairRetriesFlag); err != nil {
+			pterm.Error.Printfln("Repair loop failed: %v", err)
+			return
+		}
+
 		if err := hm.Review(); err != nil {
 			pterm.Error.Printfln("Review phase failed: %v", err)
 			return
@@ -123,12 +129,12 @@ var buildCmd = &cobra.Command{
 func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 	artifactsDir := filepath.Join(routerDir, "artifacts")
 	summary := map[string]interface{}{
-		"project":     hm.Project().Name,
-		"model":       hm.Model(),
-		"teams":       len(hm.Teams()),
-		"decisions":   len(hm.Decisions()),
-		"plan":        hm.Plan() != nil,
-		"phases":      hm.StateHistory(),
+		"project":      hm.Project().Name,
+		"model":        hm.Model(),
+		"teams":        len(hm.Teams()),
+		"decisions":    len(hm.Decisions()),
+		"plan":         hm.Plan() != nil,
+		"phases":       hm.StateHistory(),
 		"generated_at": time.Now().UTC().Format(time.RFC3339),
 	}
 	data, _ := json.MarshalIndent(summary, "", "  ")
@@ -138,5 +144,6 @@ func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 func init() {
 	buildCmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Pipeline profile (quick, full)")
 	buildCmd.Flags().BoolVar(&tuiFlag, "tui", false, "Use terminal UI mode")
+	buildCmd.Flags().IntVar(&repairRetriesFlag, "repair-retries", 2, "Maximum repair attempts after validation failure")
 	rootCmd.AddCommand(buildCmd)
 }

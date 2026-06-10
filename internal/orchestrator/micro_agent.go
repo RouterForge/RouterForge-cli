@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/routerforge/cli/internal/engine"
 	"github.com/routerforge/cli/internal/event"
 	"github.com/routerforge/cli/internal/memory"
 	"github.com/routerforge/cli/pkg/models"
-	"github.com/google/uuid"
 )
 
 type MicroAgent struct {
@@ -255,38 +255,9 @@ Rules:
 		return fmt.Errorf("empty response from LLM")
 	}
 
-	filesWritten := 0
-	// Parse FILE: sections from the response
-	sections := strings.Split(result, "FILE:")
-	for _, section := range sections {
-		section = strings.TrimSpace(section)
-		if section == "" {
-			continue
-		}
-		// Extract filename (first line)
-		parts := strings.SplitN(section, "\n", 2)
-		fileName := strings.TrimSpace(parts[0])
-		// Strip --- separator if present
-		fileName = strings.TrimLeft(fileName, "- ")
-		fileName = strings.TrimSpace(fileName)
-		if fileName == "" {
-			continue
-		}
-
-		content := ""
-		if len(parts) > 1 {
-			content = strings.TrimSpace(parts[1])
-			// Strip leading --- separator
-			content = strings.TrimLeft(content, "- ")
-			content = strings.TrimSpace(content)
-		}
-
-		fullPath := filepath.Join(projectDir, fileName)
-		os.MkdirAll(filepath.Dir(fullPath), 0755)
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("write %s: %w", fileName, err)
-		}
-		filesWritten++
+	filesWritten, err := writeFileSections(projectDir, result)
+	if err != nil {
+		return err
 	}
 
 	// Fallback: if no FILE: sections were parsed, write entire output as a single file

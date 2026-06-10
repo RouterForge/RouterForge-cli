@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.8.0] — 2026-06-10
+
+### Added (Repair Engine — Closed Execution Loop)
+
+#### RepairUntilValid (internal/orchestrator/repair.go)
+- Post-generation validation loop that detects build/runtime failures and calls the configured model to repair
+- `ValidateProject()` detects project type (go, node, static-web, empty) and runs project-appropriate validation:
+  - Go: checks `go.mod` exists, runs `go test ./...`
+  - Static web: validates `index.html` asset references, runs `node --check` on JS files
+  - Node: runs `npm run build` / `npm test` when available
+  - Empty: reports failure
+- `repairProject()` constructs a repair prompt with validation output, project files listing with content excerpts, and repair instructions; re-applies `FILE:` sections from the LLM response
+- Configurable repair retries via `--repair-retries` flag (default 2)
+- Validation artifacts saved to `.routerforge/artifacts/validation-N.json`
+
+#### Shared FILE: Section Parser (internal/orchestrator/file_sections.go)
+- `writeFileSections()` extracted from `TaskRunner.Execute` and shared between generation and repair
+- `safeProjectPath()` directory traversal protection
+- Improved content trimming: strips `---` separators more reliably
+
+#### Tests (internal/orchestrator/repair_test.go)
+- `TestWriteFileSectionsStripsSeparator`: verifies `---` does not leak into generated source
+- `TestWriteFileSectionsRejectsTraversal`: verifies paths like `../escape.txt` are rejected
+- `TestValidateProjectStaticWebMissingAsset`: verifies missing JS/CSS in `index.html` is detected
+- `TestValidateProjectGoRequiresModule`: verifies Go projects without `go.mod` fail validation
+
+### Changed
+- Build pipeline: `Execute → Validate → Repair → Revalidate → Review` (RepairUntilValid injected between Execute and Review)
+- `Review()` no longer fails on task count or task failure rate. Task reliability is reported as observability only. Software validation determines build success.
+- `RunFullPipeline()`: includes RepairUntilValid(2) step
+- Review gates relaxed — task status tracked but validation is the success gate
+
+### Fixed
+- Generated source files no longer contain literal `---` separator lines
+- Path traversal rejection in generated file paths
+
 ## [1.7.1] — 2026-06-10
 
 ### Fixed (Execution Reliability — Build produces real source files)

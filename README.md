@@ -55,7 +55,7 @@ make build
 |---------|-------------|
 | `init` | Initialize a new RouterForge project |
 | `plan` | Interactive planning phase |
-| `build` | Execute the build pipeline |
+| `build` | Execute the build pipeline (with repair loop) |
 | `analyze` | Repository Intelligence Engine + Capability Fusion + Architecture Generator |
 | `agent` | Spawn dynamic sub-agents |
 | `serve` | Serve generated artifacts (with health endpoints) |
@@ -72,6 +72,9 @@ routerforge build --profile quick
 
 # Full: backend + frontend + security + QA
 routerforge build --profile full
+
+# With repair loop (max 3 repair attempts)
+routerforge build --repair-retries 3
 ```
 
 ### Repository Intelligence V2
@@ -224,6 +227,7 @@ routerforge build --profile quick --tui
 - **Event Bus**: Pub/sub lifecycle events for real-time monitoring
 - **Memory System**: In-memory store with context compression, checkpoint/restore, and scope-based access policies (read/write/admin levels with wildcard matching)
 - **Token Budget Tracking**: Per-agent, per-phase, and global token limits with automatic 90% usage warnings and hard caps
+- **Repair Engine**: Post-generation validation with closed repair loop. Detects broken builds, missing files, and runtime errors; calls LLM to repair; revalidates. Configurable retry budget (`--repair-retries`).
 - **Terminal UI**: Bubbletea-powered live pipeline visualization (`build --tui`)
 - **Repository Intelligence V2**: Unified Semantic Code Model (`Codebase`) with single-pass Go parsing, dependency graph, call graph (selector + direct calls), architecture fingerprinting from code relationships (import direction, layer isolation, DIP detection), capability extraction with full source traceability, JSON serialization
 - **Capability Graph**: Connected graph of routes, handlers, middleware, services, repositories, data models, interfaces, implementations, packages, databases — replaces flat capability lists with typed nodes and labeled edges. Answers "what does it do?", "how?", "who is responsible?"

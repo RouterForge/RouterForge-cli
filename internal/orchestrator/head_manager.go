@@ -22,29 +22,29 @@ import (
 )
 
 type HeadManager struct {
-	project           *models.Project
-	projectDir        string
-	stateMachine      *StateMachine
-	lifecycleMachine  *LifecycleStateMachine
-	teams             map[string]*TeamManager
-	decisions         []models.Decision
-	messages          []models.AgentMessage
-	model             string
-	userProxy         agent.UserInputProvider
-	bus               event.Bus
-	mem               memory.Store
-	plan              *models.Plan
-	tracePath         string
-	tokenBudget       *TokenBudget
-	tokenTracker      *TokenTracker
-	costTracker       *CostTracker
-	reviewGates       *ReviewGateManager
-	memPolicy         *MemoryPolicy
-	memEnforcer       *MemoryPolicyEnforcer
-	sandbox           *ToolSandbox
-	spawner  *engine.AgentSpawner
-	scheduler *Scheduler
-	runtime   *Runtime
+	project          *models.Project
+	projectDir       string
+	stateMachine     *StateMachine
+	lifecycleMachine *LifecycleStateMachine
+	teams            map[string]*TeamManager
+	decisions        []models.Decision
+	messages         []models.AgentMessage
+	model            string
+	userProxy        agent.UserInputProvider
+	bus              event.Bus
+	mem              memory.Store
+	plan             *models.Plan
+	tracePath        string
+	tokenBudget      *TokenBudget
+	tokenTracker     *TokenTracker
+	costTracker      *CostTracker
+	reviewGates      *ReviewGateManager
+	memPolicy        *MemoryPolicy
+	memEnforcer      *MemoryPolicyEnforcer
+	sandbox          *ToolSandbox
+	spawner          *engine.AgentSpawner
+	scheduler        *Scheduler
+	runtime          *Runtime
 }
 
 func NewHeadManager(model string) *HeadManager {
@@ -123,11 +123,11 @@ func (hm *HeadManager) SetUserProxy(up agent.UserInputProvider) {
 	hm.userProxy = up
 }
 
-func (hm *HeadManager) Project() *models.Project            { return hm.project }
-func (hm *HeadManager) Teams() map[string]*TeamManager      { return hm.teams }
-func (hm *HeadManager) State() Phase                        { return hm.stateMachine.current }
-func (hm *HeadManager) Model() string                       { return hm.model }
-func (hm *HeadManager) Decisions() []models.Decision        { return hm.decisions }
+func (hm *HeadManager) Project() *models.Project               { return hm.project }
+func (hm *HeadManager) Teams() map[string]*TeamManager         { return hm.teams }
+func (hm *HeadManager) State() Phase                           { return hm.stateMachine.current }
+func (hm *HeadManager) Model() string                          { return hm.model }
+func (hm *HeadManager) Decisions() []models.Decision           { return hm.decisions }
 func (hm *HeadManager) StateHistory() []models.PhaseTransition { return hm.stateMachine.History() }
 
 func (hm *HeadManager) Understand() error {
@@ -191,14 +191,14 @@ var (
 )
 
 var modelDescriptions = map[string]string{
-	"big-pickle":                 "default, balanced",
-	"deepseek-v4-flash-free":     "fast, good for simple/repetitive tasks",
-	"mimo-v2.5-free":             "code generation strength",
-	"minimax-m3-free":            "general purpose free model",
-	"nemotron-3-super-free":      "larger context, reasoning",
-	"nemotron-3-ultra-free":      "highest quality, complex reasoning",
-	"north-mini-code-free":       "code generation, lightweight",
-	"qwen3.6-plus-free":          "general purpose free model",
+	"big-pickle":             "default, balanced",
+	"deepseek-v4-flash-free": "fast, good for simple/repetitive tasks",
+	"mimo-v2.5-free":         "code generation strength",
+	"minimax-m3-free":        "general purpose free model",
+	"nemotron-3-super-free":  "larger context, reasoning",
+	"nemotron-3-ultra-free":  "highest quality, complex reasoning",
+	"north-mini-code-free":   "code generation, lightweight",
+	"qwen3.6-plus-free":      "general purpose free model",
 }
 
 func describeModel(name string) string {
@@ -473,16 +473,16 @@ func (hm *HeadManager) savePlanArtifact(p *models.Plan) {
 	os.WriteFile(filepath.Join(artifactsDir, "plan.json"), data, 0644)
 }
 
-func (hm *HeadManager) Plan() *models.Plan { return hm.plan }
-func (hm *HeadManager) TokenBudget() *TokenBudget { return hm.tokenBudget }
-func (hm *HeadManager) TokenTracker() *TokenTracker { return hm.tokenTracker }
-func (hm *HeadManager) MemoryPolicy() *MemoryPolicy { return hm.memPolicy }
-func (hm *HeadManager) Sandbox() *ToolSandbox { return hm.sandbox }
-func (hm *HeadManager) Spawner() *engine.AgentSpawner { return hm.spawner }
-func (hm *HeadManager) Scheduler() *Scheduler { return hm.scheduler }
-func (hm *HeadManager) Runtime() *Runtime { return hm.runtime }
+func (hm *HeadManager) Plan() *models.Plan                { return hm.plan }
+func (hm *HeadManager) TokenBudget() *TokenBudget         { return hm.tokenBudget }
+func (hm *HeadManager) TokenTracker() *TokenTracker       { return hm.tokenTracker }
+func (hm *HeadManager) MemoryPolicy() *MemoryPolicy       { return hm.memPolicy }
+func (hm *HeadManager) Sandbox() *ToolSandbox             { return hm.sandbox }
+func (hm *HeadManager) Spawner() *engine.AgentSpawner     { return hm.spawner }
+func (hm *HeadManager) Scheduler() *Scheduler             { return hm.scheduler }
+func (hm *HeadManager) Runtime() *Runtime                 { return hm.runtime }
 func (hm *HeadManager) ResourceManager() *ResourceManager { return hm.runtime.ResourceMgr }
-func (hm *HeadManager) MemoryPool() *MemoryPool { return hm.runtime.MemoryPool }
+func (hm *HeadManager) MemoryPool() *MemoryPool           { return hm.runtime.MemoryPool }
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
 func (hm *HeadManager) SetProjectDir(dir string) { hm.projectDir = dir }
@@ -630,15 +630,17 @@ func (hm *HeadManager) Review() error {
 		}
 	}
 
-	// Execution gates: fail if no tasks passed or >50% failures
+	// Task completion is reported for observability only. Software validation and
+	// repair now define build success.
 	if totalTasks == 0 {
-		pterm.Error.Println("REVIEW GATE FAILED: No tasks were executed — build produced no output")
-		return fmt.Errorf("review gate failed: no tasks executed")
+		pterm.Warning.Println("No agent tasks were executed")
+		hm.logDecision("review", "Review complete: no agent tasks were executed")
+		hm.WriteTrace("phase_end", "head_manager", "review", "", "completed", "review complete with no tasks")
+		return nil
 	}
 	failRate := float64(failedTasks) / float64(totalTasks)
 	if failRate > 0.5 {
-		pterm.Error.Printfln("REVIEW GATE FAILED: %.0f%% of tasks failed (%d/%d)", failRate*100, failedTasks, totalTasks)
-		return fmt.Errorf("review gate failed: %.0f%% task failure rate exceeds 50%% threshold", failRate*100)
+		pterm.Warning.Printfln("Task reliability warning: %.0f%% of tasks failed (%d/%d)", failRate*100, failedTasks, totalTasks)
 	}
 
 	hm.logDecision("review", fmt.Sprintf("Review complete: %d/%d tasks passed", totalTasks-failedTasks, totalTasks))
@@ -647,11 +649,11 @@ func (hm *HeadManager) Review() error {
 	return nil
 }
 
-func (hm *HeadManager) LifecyclePhase() LifecyclePhase    { return hm.lifecycleMachine.Current() }
-func (hm *HeadManager) LifecycleStr() string              { return hm.lifecycleMachine.CurrentStr() }
-func (hm *HeadManager) CostTracker() *CostTracker         { return hm.costTracker }
-func (hm *HeadManager) ReviewGates() *ReviewGateManager   { return hm.reviewGates }
-func (hm *HeadManager) CanAdvanceLifecycle() bool         { return hm.reviewGates.AllRequiredPassed() }
+func (hm *HeadManager) LifecyclePhase() LifecyclePhase  { return hm.lifecycleMachine.Current() }
+func (hm *HeadManager) LifecycleStr() string            { return hm.lifecycleMachine.CurrentStr() }
+func (hm *HeadManager) CostTracker() *CostTracker       { return hm.costTracker }
+func (hm *HeadManager) ReviewGates() *ReviewGateManager { return hm.reviewGates }
+func (hm *HeadManager) CanAdvanceLifecycle() bool       { return hm.reviewGates.AllRequiredPassed() }
 
 func (hm *HeadManager) AdvanceLifecycle() error {
 	if !hm.CanAdvanceLifecycle() {
@@ -722,6 +724,10 @@ func (hm *HeadManager) RunFullPipeline() error {
 
 	if err := hm.Execute(); err != nil {
 		return fmt.Errorf("execute phase failed: %w", err)
+	}
+
+	if err := hm.RepairUntilValid(2); err != nil {
+		return fmt.Errorf("repair loop failed: %w", err)
 	}
 
 	if err := hm.Review(); err != nil {
