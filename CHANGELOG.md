@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.0.8] — 2026-06-11
+## [2.0.84] — 2026-06-11
 
 ### Agent-to-Agent Chat & Live Activity/Code Stream (ChatGPT Suggestions)
 
