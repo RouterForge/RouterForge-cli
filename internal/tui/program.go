@@ -47,6 +47,11 @@ func NewProgram(hm *orchestrator.HeadManager) *Program {
 			Text: fmt.Sprintf("Project: %s | %s", proj.Name, proj.Goal),
 			Type: LineInfo,
 		})
+		p.model.addLineToTab("team-chat", Line{
+			Time: time.Now().Format("15:04:05"),
+			Text: fmt.Sprintf("Project initialized: %s", proj.Name),
+			Type: LinePhase,
+		})
 		p.model.mu.Unlock()
 
 		hm.Bus().Subscribe("*", func(evt event.Event) {
@@ -133,6 +138,11 @@ func (p *Program) handleEvent(evt event.Event) {
 						Text: fmt.Sprintf("Team %s created and ready.", domain),
 						Type: LineSuccess,
 					})
+					p.addLine("team-chat", Line{
+						Time: ts,
+						Text: fmt.Sprintf("\U0001F91D %s team assembled", capitalize(domain)),
+						Type: LineAgentChat,
+					})
 				}
 			}
 		} else if strings.Contains(payload, "micro-agent") && source != "" {
@@ -164,6 +174,11 @@ func (p *Program) handleEvent(evt event.Event) {
 				Text: fmt.Sprintf("Agent online: %s", role),
 				Type: LineSuccess,
 			})
+			p.addLine("team-chat", Line{
+				Time: ts,
+				Text: fmt.Sprintf("%s Agent %s: Ready to work", agentRoleIcon(role), capitalize(role)),
+				Type: LineAgentChat,
+			})
 		} else {
 			p.addLine("head_manager", Line{
 				Time: ts,
@@ -173,6 +188,14 @@ func (p *Program) handleEvent(evt event.Event) {
 		}
 
 	case event.EvtTaskStarted:
+		p.addLine("team-chat", Line{
+			Time: ts,
+			Text: fmt.Sprintf("%s Agent %s: Starting task — %s",
+				agentRoleIcon(p.roleForID(source)),
+				capitalize(p.roleForID(source)),
+				payload),
+			Type: LineAgentChat,
+		})
 		tabID := p.tabForID(source)
 		p.addLine(tabID, Line{
 			Time: ts,
@@ -181,6 +204,13 @@ func (p *Program) handleEvent(evt event.Event) {
 		})
 
 	case event.EvtTaskCompleted:
+		p.addLine("team-chat", Line{
+			Time: ts,
+			Text: fmt.Sprintf("%s Agent %s: Task complete ✓",
+				agentRoleIcon(p.roleForID(source)),
+				capitalize(p.roleForID(source))),
+			Type: LineAgentChat,
+		})
 		tabID := p.tabForID(source)
 		p.addLine(tabID, Line{
 			Time: ts,
@@ -198,6 +228,14 @@ func (p *Program) handleEvent(evt event.Event) {
 		p.model.mu.Unlock()
 
 	case event.EvtTaskFailed:
+		p.addLine("team-chat", Line{
+			Time: ts,
+			Text: fmt.Sprintf("%s Agent %s: Task failed ✗ — %s",
+				agentRoleIcon(p.roleForID(source)),
+				capitalize(p.roleForID(source)),
+				payload),
+			Type: LineAgentChat,
+		})
 		tabID := p.tabForID(source)
 		p.addLine(tabID, Line{
 			Time: ts,
@@ -211,24 +249,45 @@ func (p *Program) handleEvent(evt event.Event) {
 			Text: fmt.Sprintf("Escalation: %s", payload),
 			Type: LineWarning,
 		})
-
-	case event.EvtArtifactCreated:
-		tabID := p.tabForID(source)
-		p.addLine(tabID, Line{
+		p.addLine("team-chat", Line{
 			Time: ts,
-			Text: fmt.Sprintf("Generated: %s", payload),
-			Type: LineArtifact,
+			Text: fmt.Sprintf("\u26A0\uFE0F Agent %s escalated: %s",
+				capitalize(p.roleForID(source)), payload),
+			Type: LineWarning,
 		})
 
+	case event.EvtArtifactCreated:
+		p.addLine("code-stream", Line{
+			Time: ts,
+			Text: fmt.Sprintf("%s %s", agentRoleIcon(p.roleForID(source)), payload),
+			Type: LineArtifact,
+		})
+		tabID := p.tabForID(source)
+		if tabID != "code-stream" {
+			p.addLine(tabID, Line{
+				Time: ts,
+				Text: fmt.Sprintf("Generated: %s", payload),
+				Type: LineArtifact,
+			})
+		}
+
 	case event.EvtToolExecuted:
-		p.model.mu.Lock()
-		p.model.logInternal(fmt.Sprintf("tool[%s]: %s", source, payload))
-		p.model.mu.Unlock()
+		p.addLine("activity", Line{
+			Time: ts,
+			Text: fmt.Sprintf("\U0001F527 [%s] %s", source, payload),
+			Type: LineTool,
+		})
 
 	case event.EvtModelCalled:
 		p.model.mu.Lock()
 		p.model.logInternal(fmt.Sprintf("model[%s]: %s", source, payload))
 		p.model.mu.Unlock()
+
+		p.addLine("team-chat", Line{
+			Time: ts,
+			Text: fmt.Sprintf("%s is thinking...", capitalize(p.roleForID(source))),
+			Type: LineThinking,
+		})
 
 	case event.EvtAgentDied:
 		tabID := p.tabForID(source)
@@ -237,7 +296,26 @@ func (p *Program) handleEvent(evt event.Event) {
 			Text: fmt.Sprintf("Agent failed: %s", payload),
 			Type: LineError,
 		})
+		p.addLine("team-chat", Line{
+			Time: ts,
+			Text: fmt.Sprintf("\u274C Agent %s failed: %s",
+				capitalize(p.roleForID(source)), payload),
+			Type: LineError,
+		})
 	}
+}
+
+func (p *Program) roleForID(id string) string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if tab, ok := p.teamTabMap[id]; ok {
+		return strings.TrimPrefix(tab, "team-")
+	}
+	if tab, ok := p.agentTabMap[id]; ok {
+		return strings.TrimPrefix(tab, "team-")
+	}
+	return id
 }
 
 func (p *Program) Run() error {

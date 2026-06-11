@@ -23,6 +23,9 @@ const (
 	LineChat
 	LineDivider
 	LinePhase
+	LineTool
+	LineAgentChat
+	LineThinking
 )
 
 type Line struct {
@@ -43,6 +46,7 @@ type AgentTab struct {
 	ParentID  string
 	TasksDone int
 	TasksCnt  int
+	Icon      string
 }
 
 type Model struct {
@@ -71,22 +75,47 @@ type Model struct {
 	onFirstMessage  func(string)
 }
 
+const systemTabCount = 4
+
 func NewModel() *Model {
 	m := &Model{
 		startTime: time.Now(),
 	}
+	now := time.Now().Format("15:04:05")
 	m.tabs = []AgentTab{
 		{
-			ID:        "head_manager",
-			Title:     "Head Manager",
-			Role:      "head_manager",
-			AgentType: "head",
-			Status:    "idle",
+			ID:    "head_manager",
+			Title: "Chat",
+			Icon:  "\U0001F4AC",
 			Lines: []Line{
-				{Time: time.Now().Format("15:04:05"), Text: "RouterForge 2.0 — AI Multi-Agent Operating System", Type: LinePhase},
-				{Time: time.Now().Format("15:04:05"), Text: "Welcome! I'm your Head Manager.", Type: LineChat},
-				{Time: time.Now().Format("15:04:05"), Text: "Tell me about the project you want to build.", Type: LineChat},
-				{Time: time.Now().Format("15:04:05"), Text: "Press Enter, describe your idea, then press Enter again to send.", Type: LineInfo},
+				{Time: now, Text: "RouterForge 2.0 — AI Multi-Agent Operating System", Type: LinePhase},
+				{Time: now, Text: "Welcome! I'm your Head Manager.", Type: LineChat},
+				{Time: now, Text: "Tell me about the project you want to build.", Type: LineChat},
+				{Time: now, Text: "Press Enter, describe your idea, then press Enter again to send.", Type: LineInfo},
+			},
+		},
+		{
+			ID:    "team-chat",
+			Title: "Team Chat",
+			Icon:  "\U0001F91D",
+			Lines: []Line{
+				{Time: now, Text: "Agent conversations will appear here.", Type: LineInfo},
+			},
+		},
+		{
+			ID:    "activity",
+			Title: "Activity",
+			Icon:  "\u2699\uFE0F",
+			Lines: []Line{
+				{Time: now, Text: "Tool usage, commands, and searches appear here.", Type: LineInfo},
+			},
+		},
+		{
+			ID:    "code-stream",
+			Title: "Code",
+			Icon:  "\U0001F4CB",
+			Lines: []Line{
+				{Time: now, Text: "Generated code and file changes appear here.", Type: LineInfo},
 			},
 		},
 	}
@@ -100,10 +129,6 @@ func (m *Model) Init() tea.Cmd {
 type UserChatMsg struct {
 	AgentID string
 	Text    string
-}
-
-type TabSwitchMsg struct {
-	Index int
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -165,6 +190,21 @@ func (m *Model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "h", "H":
 		m.activeTab = 0
 		return m, nil
+	case "t", "T":
+		if len(m.tabs) > 1 {
+			m.activeTab = 1
+		}
+		return m, nil
+	case "a", "A":
+		if len(m.tabs) > 2 {
+			m.activeTab = 2
+		}
+		return m, nil
+	case "c", "C":
+		if len(m.tabs) > 3 {
+			m.activeTab = 3
+		}
+		return m, nil
 	case "up":
 		if m.activeTab < len(m.tabs) {
 			if m.tabs[m.activeTab].Scroll > 0 {
@@ -221,7 +261,7 @@ func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.pipelineStarted = true
 				tab.Lines = append(tab.Lines, Line{
 					Time: time.Now().Format("15:04:05"),
-					Text: "Got it! Starting the multi-agent pipeline...",
+					Text: "Got it! Assembling agent teams...",
 					Type: LinePhase,
 				})
 				go m.onFirstMessage(text)
@@ -340,30 +380,39 @@ func (m *Model) renderTabs() string {
 	var tabBoxes []string
 	for i, tab := range m.tabs {
 		isActive := i == m.activeTab
-		icon := "○"
-		switch tab.Status {
-		case "active", "running":
+		isSystem := i < systemTabCount && i > 0
+
+		icon := tab.Icon
+		if icon == "" {
+			icon = "○"
+		}
+		if tab.Status == "active" || tab.Status == "running" {
 			icon = "●"
-		case "completed":
-			icon = "✅"
-		case "failed":
-			icon = "❌"
-		case "blocked":
-			icon = "⚠"
 		}
 
+		fgColor := "#9CA3AF"
 		if isActive {
-			style := lipgloss.NewStyle().
-				Background(lipgloss.Color("#7C3AED")).
-				Foreground(lipgloss.Color("#FFFFFF")).
-				Padding(0, 2)
-			tabBoxes = append(tabBoxes, style.Render(fmt.Sprintf("%s %s", icon, tab.Title)))
-		} else {
-			style := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#9CA3AF")).
-				Padding(0, 2)
-			tabBoxes = append(tabBoxes, style.Render(fmt.Sprintf("%s %s", icon, tab.Title)))
+			fgColor = "#FFFFFF"
 		}
+		style := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(fgColor)).
+			Padding(0, 1)
+
+		if isActive {
+			bgColor := "#7C3AED"
+			if isSystem {
+				bgColor = "#374151"
+			}
+			style = style.Background(lipgloss.Color(bgColor))
+		} else if isSystem {
+			style = style.Foreground(lipgloss.Color("#6B7280"))
+		}
+
+		title := tab.Title
+		if tab.TasksCnt > 0 {
+			title = fmt.Sprintf("%s (%d/%d)", tab.Title, tab.TasksDone, tab.TasksCnt)
+		}
+		tabBoxes = append(tabBoxes, style.Render(fmt.Sprintf("%s %s", icon, title)))
 	}
 
 	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, tabBoxes...)
@@ -388,8 +437,7 @@ func (m *Model) renderContent() string {
 		Foreground(lipgloss.Color("#7C3AED")).
 		Padding(0, 1)
 
-	var headerParts []string
-	headerParts = append(headerParts, fmt.Sprintf("  %s", tab.Title))
+	headerParts := []string{fmt.Sprintf("  %s %s", tab.Icon, tab.Title)}
 	if tab.Role != "" {
 		headerParts = append(headerParts, fmt.Sprintf("(%s)", tab.Role))
 	}
@@ -456,7 +504,7 @@ func (m *Model) renderLine(line Line) string {
 
 	timeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
 
-	maxW := m.width - 12
+	maxW := m.width - 14
 	text := line.Text
 	if maxW > 0 && len(text) > maxW {
 		text = text[:maxW-3] + "..."
@@ -464,47 +512,61 @@ func (m *Model) renderLine(line Line) string {
 
 	switch line.Type {
 	case LineSuccess:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Render("✓"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineError:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Render("✗"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineWarning:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("△"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineInfo:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("●"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineArtifact:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#8B5CF6")).Render("📄"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#8B5CF6")).Render("\U0001F4C4"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineDecision:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("⚡"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("\u26A1"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	case LineChat:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED")).Render("💬"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED")).Render("\U0001F4AC"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#E5E7EB")).Render(text))
 	case LinePhase:
-		return fmt.Sprintf("%s %s %s",
+		return fmt.Sprintf("  %s %s %s",
 			timeStyle.Render(prefix),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("▶"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("\u25B6"),
 			lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render(text))
+	case LineTool:
+		return fmt.Sprintf("  %s %s %s",
+			timeStyle.Render(prefix),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("\U0001F527"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
+	case LineAgentChat:
+		return fmt.Sprintf("  %s %s",
+			timeStyle.Render(prefix),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
+	case LineThinking:
+		return fmt.Sprintf("  %s %s %s",
+			timeStyle.Render(prefix),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("\U0001F9E0"),
+			lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#9CA3AF")).Render(text))
 	default:
-		return fmt.Sprintf("%s   %s",
+		return fmt.Sprintf("  %s   %s",
 			timeStyle.Render(prefix),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Render(text))
 	}
@@ -520,7 +582,7 @@ func (m *Model) renderInput() string {
 	prompt := "> "
 	cursor := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#7C3AED")).
-		Render("█")
+		Render("\u2588")
 
 	text := m.input
 	maxInputW := m.width - 10
@@ -540,9 +602,11 @@ func (m *Model) renderStatusBar() string {
 	agentCount := 0
 	active := 0
 	for _, t := range m.tabs {
-		agentCount++
-		if t.Status == "active" || t.Status == "running" {
-			active++
+		if t.AgentType == "team" || t.AgentType == "micro" {
+			agentCount++
+			if t.Status == "active" || t.Status == "running" {
+				active++
+			}
 		}
 	}
 	agentsInfo := fmt.Sprintf("Agents: %d/%d", active, agentCount)
@@ -581,11 +645,11 @@ func (m *Model) renderFooter() string {
 	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563"))
 
 	hints := []string{
-		"Tab/←→:Switch",
+		"Tab/\u2190\u2192:Switch",
 		"Enter:Chat",
-		"↑↓:Scroll",
+		"\u2191\u2193:Scroll",
 		"0-9:Jump",
-		"h:Head",
+		"h:t/Chat",
 		"q:Quit",
 	}
 
@@ -597,6 +661,30 @@ func (m *Model) renderFooter() string {
 	padding := strings.Repeat(" ", spacer)
 
 	return hintStyle.Render(" " + content + padding)
+}
+
+func agentRoleIcon(role string) string {
+	r := strings.ToLower(role)
+	switch {
+	case strings.Contains(r, "frontend"), strings.Contains(r, "ui"), strings.Contains(r, "react"):
+		return "\U0001F3A8"
+	case strings.Contains(r, "backend"), strings.Contains(r, "api"), strings.Contains(r, "server"):
+		return "\u2699\uFE0F"
+	case strings.Contains(r, "qa"), strings.Contains(r, "test"), strings.Contains(r, "quality"):
+		return "\U0001F9EA"
+	case strings.Contains(r, "devops"), strings.Contains(r, "deploy"), strings.Contains(r, "infra"):
+		return "\U0001F680"
+	case strings.Contains(r, "security"), strings.Contains(r, "auth"):
+		return "\U0001F512"
+	case strings.Contains(r, "database"), strings.Contains(r, "db"), strings.Contains(r, "data"):
+		return "\U0001F4BE"
+	case strings.Contains(r, "design"), strings.Contains(r, "ux"):
+		return "\U0001F3A8"
+	case strings.Contains(r, "doc"), strings.Contains(r, "writer"), strings.Contains(r, "content"):
+		return "\U0001F4DD"
+	default:
+		return "\U0001F916"
+	}
 }
 
 func (m *Model) addLineToTab(tabID string, line Line) {
@@ -621,15 +709,6 @@ func (m *Model) addLineToTab(tabID string, line Line) {
 	}
 }
 
-func (m *Model) addLineToActiveTab(line Line) {
-	if m.activeTab < len(m.tabs) {
-		m.tabs[m.activeTab].Lines = append(m.tabs[m.activeTab].Lines, line)
-		if len(m.tabs[m.activeTab].Lines) > 200 {
-			m.tabs[m.activeTab].Lines = m.tabs[m.activeTab].Lines[len(m.tabs[m.activeTab].Lines)-200:]
-		}
-	}
-}
-
 func (m *Model) createTab(id, title, role, agentType, parentID string) {
 	for _, t := range m.tabs {
 		if t.ID == id {
@@ -643,6 +722,7 @@ func (m *Model) createTab(id, title, role, agentType, parentID string) {
 		AgentType: agentType,
 		Status:    "created",
 		ParentID:  parentID,
+		Icon:      agentRoleIcon(role),
 		Lines: []Line{
 			{Time: time.Now().Format("15:04:05"), Text: fmt.Sprintf("%s agent created.", title), Type: LineInfo},
 		},

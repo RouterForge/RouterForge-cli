@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.0.8] — 2026-06-11
+
+### Agent-to-Agent Chat & Live Activity/Code Stream (ChatGPT Suggestions)
+
+#### New System Tabs (internal/tui/model.go)
+- **Team Chat tab** (`t`): Agent-to-agent conversations synthesized from task events — shows when agents start/complete/fail tasks, plus "thinking" indicators on model calls
+- **Activity tab** (`a`): Tool usage, commands, and search operations appear here; ready for future `tool.executed` events from LLM client integration
+- **Code Stream tab** (`c`): Generated files and artifacts appear here automatically
+- Permanent system tabs: Chat (head manager), Team Chat, Activity, Code — followed by dynamic team tabs
+- Keyboard shortcuts: `h` → Chat, `t` → Team Chat, `a` → Activity, `c` → Code
+
+#### Agent Rendering
+- **Role icons**: Agents render with emoji icons based on role — 🎨 Frontend, ⚙️ Backend, 🧪 QA, 🚀 DevOps, 🔒 Security, 💾 Database, 📝 Content
+- **Line types**: New `LineTool` (🔧) for tool usage, `LineAgentChat` (agent dialog), `LineThinking` (🧠 for model reasoning)
+- Agent-to-agent messages show `agentRoleIcon() + Agent Name` prefix for at-a-glance identification
+
+#### Event Routing (internal/tui/program.go)
+- `EvtArtifactCreated` → Code Stream tab (always), plus agent tab for context
+- `EvtToolExecuted` → Activity tab (visible tool stream)
+- `EvtModelCalled` → internal log (hidden) + "thinking" indicator in Team Chat
+- `EvtAgentCreated` → Team Chat with role icon and status message
+- `EvtTaskStarted/Completed/Failed` → Team Chat (agent conversation format) + agent tab
+- `EvtEscalation` → Team Chat (warning format) + Head Manager
+- `EvtAgentDied` → Team Chat (error) + agent tab
+
+#### Updated
+- Version bumped to 2.0.8 across all references
+- `roleForID()` helper resolves event source IDs to human-readable role names
+
 ## [2.0.0] — 2026-06-11
 
 ### RouterForge 2.0 — Multi-Agent OS Interface
