@@ -71,8 +71,8 @@ type Model struct {
 	internalLog []string
 	startTime   time.Time
 
-	pipelineStarted bool
 	onFirstMessage  func(string)
+	pipelineRunning bool
 }
 
 const systemTabCount = 4
@@ -257,14 +257,8 @@ func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 			m.input = ""
 
-			if m.activeTab == 0 && !m.pipelineStarted && m.onFirstMessage != nil {
-				m.pipelineStarted = true
-				tab.Lines = append(tab.Lines, Line{
-					Time: time.Now().Format("15:04:05"),
-					Text: "Got it! Assembling agent teams...",
-					Type: LinePhase,
-				})
-				go m.onFirstMessage(text)
+			if m.activeTab == 0 && m.onFirstMessage != nil {
+				m.onFirstMessage(text)
 			}
 		}
 		return m, nil

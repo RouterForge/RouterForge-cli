@@ -8,25 +8,21 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/routerforge/cli/internal/agent"
+	"github.com/routerforge/cli/internal/engine"
 	"github.com/routerforge/cli/internal/event"
 	"github.com/routerforge/cli/internal/orchestrator"
-)
-
-type Intent int
-
-const (
-	IntentChat Intent = iota
-	IntentProject
-	IntentResearch
 )
 
 type Program struct {
 	model *Model
 	hm    *orchestrator.HeadManager
 
-	mu           sync.RWMutex
-	agentTabMap  map[string]string
-	teamTabMap   map[string]string
+	mu            sync.RWMutex
+	agentTabMap   map[string]string
+	teamTabMap    map[string]string
+	chatHistory   []engine.ChatMessage
+	projectReady  bool
+	pipelineLaunched bool
 }
 
 func NewProgram(hm *orchestrator.HeadManager) *Program {
@@ -40,80 +36,60 @@ func NewProgram(hm *orchestrator.HeadManager) *Program {
 
 	m.onFirstMessage = func(text string) {
 		p.model.mu.Lock()
-		intent := detectIntent(text)
-
-		switch intent {
-		case IntentChat:
+		if p.model.pipelineRunning {
 			p.model.addLineToTab("head_manager", Line{
 				Time: time.Now().Format("15:04:05"),
-				Text: chatResponse(text),
-				Type: LineChat,
-			})
-
-		case IntentProject:
-			if p.model.pipelineRunning {
-				p.model.addLineToTab("head_manager", Line{
-					Time: time.Now().Format("15:04:05"),
-					Text: "Pipeline is already running. Please wait...",
-					Type: LineInfo,
-				})
-				p.model.mu.Unlock()
-				return
-			}
-			p.model.pipelineRunning = true
-			p.model.addLineToTab("head_manager", Line{
-				Time: time.Now().Format("15:04:05"),
-				Text: fmt.Sprintf("Project: %s", text),
-				Type: LinePhase,
-			})
-			proj := p.hm.Project()
-			proj.Name = extractName(text)
-			proj.Goal = text
-			proj.Description = text
-			if proj.TechStack == "" {
-				proj.TechStack = "Go, React, TypeScript"
-			}
-			p.model.mu.Unlock()
-
-			p.hm.SetUserProxy(agent.NewSilentUserProxy())
-
-			p.model.mu.Lock()
-			p.model.addLineToTab("team-chat", Line{
-				Time: time.Now().Format("15:04:05"),
-				Text: fmt.Sprintf("Project initialized: %s", proj.Name),
-				Type: LinePhase,
-			})
-			p.model.mu.Unlock()
-
-			hm.Bus().Subscribe("*", func(evt event.Event) {
-				p.handleEvent(evt)
-			})
-
-			p.hm.RunFullPipeline()
-
-		case IntentResearch:
-			if p.model.pipelineRunning {
-				p.model.addLineToTab("head_manager", Line{
-					Time: time.Now().Format("15:04:05"),
-					Text: "Research not yet available. Starting project mode instead.",
-					Type: LineInfo,
-				})
-				p.model.mu.Unlock()
-				return
-			}
-			p.model.pipelineRunning = true
-			p.model.addLineToTab("head_manager", Line{
-				Time: time.Now().Format("15:04:05"),
-				Text: fmt.Sprintf("Research: %s", text),
-				Type: LinePhase,
-			})
-			p.model.mu.Unlock()
-
-			p.model.mu.Lock()
-			p.model.addLineToTab("head_manager", Line{
-				Time: time.Now().Format("15:04:05"),
-				Text: "Research mode is coming soon. For now, describe your project and I'll build it.",
+				Text: "Pipeline is already running. Please wait...",
 				Type: LineInfo,
+			})
+			p.model.mu.Unlock()
+			return
+		}
+		p.model.mu.Unlock()
+
+		systemPrompt := `You are RouterForge Head Manager, an AI project architect.
+
+Your job: determine if the user wants to chat or build a project.
+
+- If greeting or casual chat: respond warmly and ask if they want to build something. Keep it brief.
+- If they want to build a project: ask clarifying questions one at a time. Gather: project type, tech stack, main features, special requirements.
+- When you have enough info to build: include "---READY---" on its own line, then summarize what you understood.
+- Be concise. Ask ONE question at a time.`
+
+		var historyBuilder strings.Builder
+		for _, msg := range p.chatHistory {
+			historyBuilder.WriteString(msg.Role + ": " + msg.Content + "\n")
+		}
+		historyBuilder.WriteString("user: " + text)
+		userPrompt := historyBuilder.String()
+
+		llm := engine.NewLLMClient(p.hm.Model())
+		llm.AgentID = "head_manager"
+		llm.Phase = "chat"
+		response, err := llm.Chat(systemPrompt, userPrompt)
+		if err != nil {
+			p.model.mu.Lock()
+			p.model.addLineToTab("head_manager", Line{
+				Time: time.Now().Format("15:04:05"),
+				Text: fmt.Sprintf("Error: %s", err.Error()),
+				Type: LineError,
+			})
+			p.model.mu.Unlock()
+			return
+		}
+
+		p.chatHistory = append(p.chatHistory,
+			engine.ChatMessage{Role: "user", Content: text},
+			engine.ChatMessage{Role: "assistant", Content: response})
+
+		if strings.Contains(response, "---READY---") {
+			p.launchPipeline(text, response)
+		} else {
+			p.model.mu.Lock()
+			p.model.addLineToTab("head_manager", Line{
+				Time: time.Now().Format("15:04:05"),
+				Text: response,
+				Type: LineChat,
 			})
 			p.model.mu.Unlock()
 		}
@@ -122,97 +98,51 @@ func NewProgram(hm *orchestrator.HeadManager) *Program {
 	return p
 }
 
-func detectIntent(text string) Intent {
-	lower := strings.ToLower(strings.TrimSpace(text))
+func (p *Program) launchPipeline(text string, llmResponse string) {
+	p.model.mu.Lock()
+	if p.pipelineLaunched {
+		p.model.mu.Unlock()
+		return
+	}
+	p.pipelineLaunched = true
+	p.model.pipelineRunning = true
 
-	greetings := []string{
-		"hi", "hello", "hey", "howdy", "sup", "yo", "hiya",
-		"good morning", "good evening", "good afternoon",
-		"what's up", "wassup", "whassup",
-	}
-	for _, g := range greetings {
-		if lower == g || strings.HasPrefix(lower, g+" ") || strings.HasPrefix(lower, g+",") || strings.HasPrefix(lower, g+"!") {
-			return IntentChat
-		}
-	}
-
-	courtesies := []string{
-		"how are you", "how's it going", "what are you doing",
-		"who are you", "what can you do", "tell me about yourself",
-		"nice to meet you", "good to see you",
-	}
-	for _, c := range courtesies {
-		if strings.Contains(lower, c) {
-			return IntentChat
-		}
+	parts := strings.SplitN(llmResponse, "---READY---", 2)
+	summary := strings.TrimSpace(parts[len(parts)-1])
+	if summary == "" {
+		summary = text
 	}
 
-	singleWords := []string{"hi", "hello", "hey", "thanks", "ok", "okay", "bye", "goodbye"}
-	for _, w := range singleWords {
-		if lower == w {
-			return IntentChat
-		}
+	p.model.addLineToTab("head_manager", Line{
+		Time: time.Now().Format("15:04:05"),
+		Text: fmt.Sprintf("Starting project: %s", summary),
+		Type: LinePhase,
+	})
+	p.model.mu.Unlock()
+
+	proj := p.hm.Project()
+	proj.Name = extractName(text)
+	proj.Goal = summary
+	proj.Description = summary
+	if proj.TechStack == "" {
+		proj.TechStack = "Go, React, TypeScript"
 	}
 
-	research := []string{
-		"search", "research", "find", "look up", "investigate",
-		"scan", "analyze", "study", "explore",
-	}
-	for _, r := range research {
-		if strings.HasPrefix(lower, r) {
-			return IntentResearch
-		}
-	}
+	p.hm.SetUserProxy(agent.NewSilentUserProxy())
 
-	project := []string{
-		"build", "create", "make", "develop", "generate",
-		"start", "new", "write", "code", "implement",
-		"design", "architect", "construct", "produce",
-		"launch", "ship", "scaffold", "init",
-	}
-	for _, p := range project {
-		if strings.HasPrefix(lower, p) {
-			return IntentProject
-		}
-	}
+	p.model.mu.Lock()
+	p.model.addLineToTab("team-chat", Line{
+		Time: time.Now().Format("15:04:05"),
+		Text: fmt.Sprintf("Project initialized: %s", proj.Name),
+		Type: LinePhase,
+	})
+	p.model.mu.Unlock()
 
-	if len(lower) <= 3 {
-		return IntentChat
-	}
+	p.hm.Bus().Subscribe("*", func(evt event.Event) {
+		p.handleEvent(evt)
+	})
 
-	return IntentProject
-}
-
-func chatResponse(text string) string {
-	lower := strings.ToLower(strings.TrimSpace(text))
-
-	switch {
-	case lower == "hi" || lower == "hello" || lower == "hey" || lower == "howdy":
-		return "Hello! How can I help you today?"
-	case lower == "good morning":
-		return "Good morning! What would you like to build?"
-	case lower == "good evening":
-		return "Good evening! Ready to create something?"
-	case lower == "hiya":
-		return "Hiya! What's on your mind?"
-	case strings.Contains(lower, "how are you"):
-		return "I'm doing great! Ready to help you build something awesome."
-	case strings.Contains(lower, "who are you"):
-		return "I'm RouterForge — an AI multi-agent operating system. I can design, build, and manage software projects."
-	case strings.Contains(lower, "what can you do"):
-		return "I can build full projects from a description. Just tell me what you want to create.\n\nExamples:\n  \"build a REST API in Go\"\n  \"create a React dashboard\"\n  \"make a CLI tool\""
-	case strings.Contains(lower, "what are you doing"):
-		return "Just waiting for you to tell me what to build!"
-	case lower == "thanks" || lower == "thank you":
-		return "You're welcome! Anything else you'd like to build?"
-	case lower == "bye" || lower == "goodbye":
-		return "See you later! Come back when you have a project in mind."
-	default:
-		if len(lower) <= 3 {
-			return "Hi there! Tell me what you'd like to build, or just say hello."
-		}
-		return "I'm here to help you build software. What project do you have in mind?"
-	}
+	p.hm.RunFullPipeline()
 }
 
 func (p *Program) tabForID(id string) string {
@@ -433,7 +363,6 @@ func (p *Program) handleEvent(evt event.Event) {
 		p.model.mu.Lock()
 		p.model.logInternal(fmt.Sprintf("model[%s]: %s", source, payload))
 		p.model.mu.Unlock()
-
 		p.addLine("team-chat", Line{
 			Time: ts,
 			Text: fmt.Sprintf("%s is thinking...", capitalize(p.roleForID(source))),
@@ -490,3 +419,5 @@ func extractName(description string) string {
 	name := strings.Join(words, " ")
 	return name
 }
+
+

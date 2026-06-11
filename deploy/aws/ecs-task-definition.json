@@ -1,0 +1,47 @@
+{
+  "family": "big-pickle",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/big-pickle-task-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "big-pickle",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/big-pickle:latest",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {"name": "PORT", "value": "8080"},
+        {"name": "ENV", "value": "production"},
+        {"name": "LOG_LEVEL", "value": "info"},
+        {"name": "DB_HOST", "value": "your-rds-endpoint"},
+        {"name": "DB_PORT", "value": "5432"},
+        {"name": "DB_USER", "value": "bigpickle"},
+        {"name": "DB_NAME", "value": "bigpickle"}
+      ],
+      "secrets": [
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-1:123456789012:parameter/big-pickle/db-password"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/big-pickle",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

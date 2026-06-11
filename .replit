@@ -1,20 +1,9 @@
-modules = ["go-1.21", "nodejs-20"]
-[agent]
-expertMode = true
+run = "go run ."
 
-[nix]
-channel = "stable-25_05"
-packages = ["lsof", "g-ls"]
+[test]
+command = "go test ./..."
 
-[[ports]]
-localPort = 1455
-externalPort = 80
-
-[[ports]]
-localPort = 4096
-externalPort = 3000
-exposeLocalhost = true
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
+[env]
+GOFLAGS = "-mod=mod"
+GONOSUMCHECK = "*"
+GONOSUMDB = "*"
