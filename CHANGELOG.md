@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.2.0] — 2026-06-11
+
+### Unified Project Lifecycle Engine
+
+The "pipeline" and "development lifecycle" are no longer separate concepts. Both are now represented as one lifecycle with two synchronized layers:
+
+#### Runtime Flow (what agents are doing right now)
+`Idle → Understand → Design → Execute → Repair → Review`
+- Repair is now a first-class phase in the runtime flow (was a separate step)
+- Flow can iterate: Review → Execute (re-execution) or Review → Understand (re-design)
+
+#### Project Maturity (product stage over time)
+`Demo → Prototype → MVP → Production`
+- After each Review gate, the system evaluates whether the project can advance to the next maturity stage
+- Auto-advances when all required gates pass
+- Stays or re-enters execution if gates fail
+
+#### Architecture Changes
+- **New**: `internal/orchestrator/lifecycle_engine.go` — unified `LifecycleEngine` binding Runtime Flow + Project Maturity + Review Gates
+- **Renamed**: `state_machine.go` → `flow.go` (RuntimeFlow with Repair phase)
+- **Renamed**: `lifecycle.go` → `maturity.go` (MaturityStateMachine)
+- **Updated**: `pkg/models/phase.go` — added `PhaseRepair` (phase 4), shifted `PhaseReview` to 5
+- **Updated**: `internal/storage/config.go` — `PipelineConfig` → `LifecycleConfig`
+- **Updated**: `internal/orchestrator/head_manager.go` — `RunFullPipeline()` → `RunLifecycle()`
+- **Updated**: TUI — replaces all "pipeline" references with "lifecycle" terminology
+- **Updated**: `cmd/build.go`, `cmd/lifecycle.go` — show unified runtime flow + project maturity
+
 ## [2.1.14] — 2026-06-11
 
 ### 40+ Slash Commands & LLM-Driven Intent Detection

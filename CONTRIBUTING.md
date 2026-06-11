@@ -19,7 +19,7 @@ internal/
   event/          — EventBus pub/sub with wildcard/prefix routing
   llm/            — Provider gateway + adapters
   memory/         — In-memory store, compression, scope-based policies
-  orchestrator/   — Head Manager, state machine, micro agents, teams, repair
+  orchestrator/   — Head Manager, lifecycle engine, runtime flow, maturity, micro agents, teams, repair
   repo/           — Repository Intelligence Engine (AST, patterns, graphs)
   storage/        — Config, BoltDB store, encrypted secrets
   tool/           — Tool registry + implementations (shell, file, search, web)

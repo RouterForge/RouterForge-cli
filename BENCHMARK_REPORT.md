@@ -158,9 +158,9 @@ But execution is where it breaks:
 **Compared to alternatives:**
 - A developer writing code directly would have produced 7 working projects in the time it took RouterForge to produce 0
 - A simple script calling an LLM with "write a complete Go CLI tool for X" would produce a single source file that could at least be compiled
-- The planning is better than raw LLM prompting, but the execution pipeline is non-functional
+- The planning is better than raw LLM prompting, but the execution lifecycle is non-functional
 
-**The honest assessment:** RouterForge currently functions as a planning assistant with a non-functional build pipeline. The architecture and team decomposition are useful outputs to show a human developer, but the system cannot yet autonomously build runnable software. The build pipeline needs fundamental rework before it can be compared to alternatives that actually produce working code.
+**The honest assessment:** RouterForge currently functions as a planning assistant with a non-functional build lifecycle. The architecture and team decomposition are useful outputs to show a human developer, but the system cannot yet autonomously build runnable software. The lifecycle runtime flow needs fundamental rework before it can be compared to alternatives that actually produce working code.
 
 ---
 
@@ -190,7 +190,7 @@ But execution is where it breaks:
 
 ### Fix 4: Repair Engine — closed execution loop (2026-06-10)
 - Added `RepairUntilValid()` — post-generation validation loop
-- After `Execute`, the build pipeline now runs:
+- After `Execute`, the lifecycle runtime flow now runs:
   `Validate → Detect Failure → Repair → Revalidate → Repeat` (up to retry budget)
 - Project type detection: Go (`go test ./...`), static web (asset reference check, `node --check`), Node (`npm build/test`), empty
 - Configurable via `--repair-retries` flag (default 2)

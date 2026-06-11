@@ -2,6 +2,8 @@ package models
 
 import "fmt"
 
+// --- Runtime Flow ---
+
 type Phase int
 
 const (
@@ -9,7 +11,8 @@ const (
 	PhaseUnderstand Phase = 1
 	PhaseDesign     Phase = 2
 	PhaseExecute    Phase = 3
-	PhaseReview     Phase = 4
+	PhaseRepair     Phase = 4
+	PhaseReview     Phase = 5
 )
 
 func (p Phase) String() string {
@@ -22,6 +25,8 @@ func (p Phase) String() string {
 		return "Design"
 	case PhaseExecute:
 		return "Execute"
+	case PhaseRepair:
+		return "Repair"
 	case PhaseReview:
 		return "Review"
 	default:
@@ -35,6 +40,8 @@ type PhaseTransition struct {
 	Reason    string `json:"reason"`
 	Timestamp string `json:"timestamp"`
 }
+
+// --- Project Maturity ---
 
 type LifecyclePhase int
 
@@ -87,4 +94,5 @@ func LifecycleDeliverable(lp LifecyclePhase) string {
 	default:
 		return ""
 	}
+
 }

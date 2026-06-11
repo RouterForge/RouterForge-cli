@@ -24,10 +24,10 @@ var (
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "Execute the build pipeline",
-	Long:  `Execute the full build pipeline: Execute agents and Review results.`,
+	Short: "Execute the project lifecycle runtime flow",
+	Long:  `Execute the runtime flow: Understand → Design → Execute → Repair → Review.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.DefaultSection.Printfln("RouterForge Build Pipeline")
+		pterm.DefaultSection.Printfln("RouterForge Lifecycle Runtime Flow")
 
 		projectDir, _ := os.Getwd()
 		routerDir := filepath.Join(projectDir, ".routerforge")
@@ -53,14 +53,14 @@ var buildCmd = &cobra.Command{
 			defer store.Close()
 		}
 
-		teams := cfg.Pipeline.Teams
+		teams := cfg.Lifecycle.Teams
 		profile := profileFlag
-		if profile != "" && cfg.Pipeline.Profiles[profile] != nil {
+		if profile != "" && cfg.Lifecycle.Profiles[profile] != nil {
 			pterm.Info.Printfln("Using profile: %s", profile)
-			teams = cfg.Pipeline.Profiles[profile].Teams
+			teams = cfg.Lifecycle.Profiles[profile].Teams
 		}
 		if profile == "" {
-			profile = cfg.Pipeline.Profile
+			profile = cfg.Lifecycle.Profile
 		}
 
 		hm := orchestrator.NewHeadManager(cfg.Model)
@@ -70,7 +70,7 @@ var buildCmd = &cobra.Command{
 		hm.SetConversationsDir(filepath.Join(routerDir, "artifacts", "conversations"))
 
 		if tuiFlag {
-			pterm.Info.Println("Starting RouterForge 2.0 multi-agent operating system...")
+			pterm.Info.Println("Starting RouterForge multi-agent operating system...")
 			p := tui.NewProgram(hm)
 			if err := p.Run(); err != nil {
 				pterm.Error.Printfln("TUI error: %v", err)
@@ -82,7 +82,7 @@ var buildCmd = &cobra.Command{
 		pterm.Info.Printfln("Building with model: %s", cfg.Model)
 		pterm.Info.Printfln("Profile: %s (teams: %v)", profile, teams)
 
-		// Try loading saved plan first so builds reuse the same decomposition
+		// Try loading saved plan first
 		planArtifact := filepath.Join(routerDir, "artifacts", "plan.json")
 		loadedSaved := false
 		if data, err := os.ReadFile(planArtifact); err == nil {
@@ -119,12 +119,11 @@ var buildCmd = &cobra.Command{
 			pterm.Warning.Printfln("Review phase: %v", err)
 		}
 
-		// Only report success if validation passed in RepairUntilValid
 		saveArtifactSummary(hm, routerDir)
-		pterm.DefaultSection.Printfln("✅ Build Complete")
-		pterm.Info.Printfln("📄 Trace: %s", filepath.Join(routerDir, "artifacts", "trace.jsonl"))
-		pterm.Info.Printfln("📄 Plan: %s", filepath.Join(routerDir, "artifacts", "plan.json"))
-		pterm.Info.Printfln("🌐 Dashboard: routerforge serve")
+		pterm.DefaultSection.Printfln("Lifecycle Runtime Flow Complete")
+		pterm.Info.Printfln("Trace: %s", filepath.Join(routerDir, "artifacts", "trace.jsonl"))
+		pterm.Info.Printfln("Plan: %s", filepath.Join(routerDir, "artifacts", "plan.json"))
+		pterm.Info.Printfln("Dashboard: routerforge serve")
 	},
 }
 
@@ -144,15 +143,12 @@ func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 	data, _ := json.MarshalIndent(summary, "", "  ")
 	os.WriteFile(filepath.Join(artifactsDir, "summary.json"), data, 0644)
 
-	// Save decisions artifact
 	decData, _ := json.MarshalIndent(hm.Decisions(), "", "  ")
 	os.WriteFile(filepath.Join(artifactsDir, "decisions.json"), decData, 0644)
 
-	// Save messages artifact
 	msgData, _ := json.MarshalIndent(hm.Messages(), "", "  ")
 	os.WriteFile(filepath.Join(artifactsDir, "messages.json"), msgData, 0644)
 
-	// Save cost/token artifact
 	if hm.CostTracker() != nil {
 		costData, _ := json.MarshalIndent(hm.CostTracker().Summary(), "", "  ")
 		os.WriteFile(filepath.Join(artifactsDir, "cost.json"), costData, 0644)
@@ -160,7 +156,6 @@ func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 		os.WriteFile(filepath.Join(artifactsDir, "cost_entries.json"), entryData, 0644)
 	}
 
-	// Save file manifest
 	projectDir := hm.ProjectDir()
 	if projectDir == "" {
 		projectDir = "."
@@ -187,8 +182,8 @@ func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 }
 
 func init() {
-	buildCmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Pipeline profile (quick, full)")
-	buildCmd.Flags().BoolVar(&tuiFlag, "tui", false, "RouterForge 2.0 multi-agent OS interface (recommended)")
+	buildCmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Lifecycle profile (quick, full)")
+	buildCmd.Flags().BoolVar(&tuiFlag, "tui", false, "RouterForge multi-agent OS interface (recommended)")
 	buildCmd.Flags().IntVar(&repairRetriesFlag, "repair-retries", 2, "Maximum repair attempts after validation failure")
 	rootCmd.AddCommand(buildCmd)
 }

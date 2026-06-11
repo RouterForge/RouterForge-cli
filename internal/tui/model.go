@@ -71,8 +71,8 @@ type Model struct {
 	internalLog []string
 	startTime   time.Time
 
-	onFirstMessage  func(string)
-	pipelineRunning bool
+	onFirstMessage   func(string)
+	lifecycleRunning bool
 }
 
 const systemTabCount = 4

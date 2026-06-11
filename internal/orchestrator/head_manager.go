@@ -24,8 +24,9 @@ import (
 type HeadManager struct {
 	project          *models.Project
 	projectDir       string
-	stateMachine     *StateMachine
-	lifecycleMachine *LifecycleStateMachine
+	runtimeFlow      *RuntimeFlow
+	maturityMachine  *MaturityStateMachine
+	lifecycle        *LifecycleEngine
 	teams            map[string]*TeamManager
 	decisions        []models.Decision
 	messages         []models.AgentMessage
@@ -53,6 +54,11 @@ func NewHeadManager(model string) *HeadManager {
 	now := time.Now().UTC().Format(time.RFC3339)
 	mp := NewMemoryPolicy()
 	sp := NewSandboxPolicy()
+
+	runtimeFlow := NewRuntimeFlow()
+	maturityMachine := NewMaturityStateMachine()
+	gates := NewReviewGateManager()
+
 	hm := &HeadManager{
 		project: &models.Project{
 			ID:             id,
@@ -62,40 +68,33 @@ func NewHeadManager(model string) *HeadManager {
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		},
-		stateMachine:     NewStateMachine(),
-		lifecycleMachine: NewLifecycleStateMachine(),
-		teams:            make(map[string]*TeamManager),
-		decisions:        []models.Decision{},
-		messages:         []models.AgentMessage{},
-		model:            model,
-		userProxy:        agent.NewTerminalUserProxy(),
-		bus:              event.NewBus(),
-		tokenBudget:      NewTokenBudget(100000),
-		tokenTracker:     NewTokenTracker(),
-		costTracker:      NewCostTracker(),
-		reviewGates:      NewReviewGateManager(),
-		memPolicy:        mp,
-		memEnforcer:      NewMemoryPolicyEnforcer(mp),
-		sandbox:          NewToolSandbox(sp),
-		spawner:          engine.NewAgentSpawner(model),
-		scheduler:        NewScheduler(3),
+		runtimeFlow:     runtimeFlow,
+		maturityMachine: maturityMachine,
+		teams:           make(map[string]*TeamManager),
+		decisions:       []models.Decision{},
+		messages:        []models.AgentMessage{},
+		model:           model,
+		userProxy:       agent.NewTerminalUserProxy(),
+		bus:             event.NewBus(),
+		tokenBudget:     NewTokenBudget(100000),
+		tokenTracker:    NewTokenTracker(),
+		costTracker:     NewCostTracker(),
+		reviewGates:     gates,
+		memPolicy:       mp,
+		memEnforcer:     NewMemoryPolicyEnforcer(mp),
+		sandbox:         NewToolSandbox(sp),
+		spawner:         engine.NewAgentSpawner(model),
+		scheduler:       NewScheduler(3),
 	}
+	hm.lifecycle = NewLifecycleEngine(hm)
 	hm.scheduler.Start()
 	hm.runtime = NewRuntime(hm.sandbox, hm.scheduler)
 	return hm
 }
 
-func (hm *HeadManager) SetBus(b event.Bus) {
-	hm.bus = b
-}
-
-func (hm *HeadManager) Bus() event.Bus {
-	return hm.bus
-}
-
-func (hm *HeadManager) SetMemory(m memory.Store) {
-	hm.mem = m
-}
+func (hm *HeadManager) SetBus(b event.Bus)        { hm.bus = b }
+func (hm *HeadManager) Bus() event.Bus             { return hm.bus }
+func (hm *HeadManager) SetMemory(m memory.Store)   { hm.mem = m }
 
 func (hm *HeadManager) AttachConsoleLogger() {
 	hm.bus.Subscribe("*", func(evt event.Event) {
@@ -120,20 +119,38 @@ func (hm *HeadManager) AttachConsoleLogger() {
 	})
 }
 
-func (hm *HeadManager) SetUserProxy(up agent.UserInputProvider) {
-	hm.userProxy = up
-}
+func (hm *HeadManager) SetUserProxy(up agent.UserInputProvider) { hm.userProxy = up }
 
 func (hm *HeadManager) Project() *models.Project               { return hm.project }
 func (hm *HeadManager) Teams() map[string]*TeamManager         { return hm.teams }
-func (hm *HeadManager) State() Phase                           { return hm.stateMachine.current }
+func (hm *HeadManager) State() RuntimePhase                    { return hm.runtimeFlow.Current() }
 func (hm *HeadManager) Model() string                          { return hm.model }
 func (hm *HeadManager) Decisions() []models.Decision           { return hm.decisions }
 func (hm *HeadManager) Messages() []models.AgentMessage        { return hm.messages }
-func (hm *HeadManager) StateHistory() []models.PhaseTransition { return hm.stateMachine.History() }
+func (hm *HeadManager) StateHistory() []models.PhaseTransition { return hm.runtimeFlow.History() }
+
+func (hm *HeadManager) LifecycleEngine() *LifecycleEngine   { return hm.lifecycle }
+
+// --- Unified lifecycle accessors (backward-compatible naming) ---
+
+func (hm *HeadManager) LifecycleStr() string            { return hm.lifecycle.MaturityStr() }
+func (hm *HeadManager) LifecyclePhase() MaturityStage   { return hm.lifecycle.MaturityStage() }
+func (hm *HeadManager) CostTracker() *CostTracker       { return hm.costTracker }
+func (hm *HeadManager) ReviewGates() *ReviewGateManager { return hm.lifecycle.Gates() }
+func (hm *HeadManager) CanAdvanceLifecycle() bool       { return hm.lifecycle.CanAdvanceMaturity() }
+
+func (hm *HeadManager) AdvanceLifecycle() error {
+	return hm.lifecycle.AdvanceMaturity()
+}
+
+func (hm *HeadManager) ApproveGate(gateType GateType, approvedBy, notes string) {
+	hm.lifecycle.ApproveGate(gateType, approvedBy, notes)
+	hm.WriteTrace("gate_approved", approvedBy, hm.lifecycle.MaturityStr(), "", "approved",
+		fmt.Sprintf("Gate %s approved by %s", gateType, approvedBy))
+}
 
 func (hm *HeadManager) Understand() error {
-	if err := hm.stateMachine.Transition(PhaseUnderstand, "Starting understand phase"); err != nil {
+	if err := hm.runtimeFlow.Transition(RuntimeUnderstand, "Starting understand phase"); err != nil {
 		return err
 	}
 	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
@@ -264,7 +281,6 @@ func fetchAvailableModels() []modelInfo {
 
 	var models []modelInfo
 	for _, m := range result.Data {
-		// Only include free models + big-pickle
 		if m.ID == "big-pickle" || strings.HasSuffix(m.ID, "-free") {
 			models = append(models, modelInfo{
 				Name:        m.ID,
@@ -289,7 +305,7 @@ func defaultModels() []modelInfo {
 
 func (hm *HeadManager) askModelChoice() string {
 	models := fetchAvailableModels()
-	pterm.Info.Println("❓ Choose an AI model for your agents:")
+	pterm.Info.Println("Choose an AI model for your agents:")
 	pterm.Println("Available free models (fetched from API):")
 	modelOpts := make([]string, len(models))
 	for i, m := range models {
@@ -319,7 +335,7 @@ func modelPromptBlock() string {
 }
 
 func (hm *HeadManager) Design() error {
-	if err := hm.stateMachine.Transition(PhaseDesign, "Starting design phase"); err != nil {
+	if err := hm.runtimeFlow.Transition(RuntimeDesign, "Starting design phase"); err != nil {
 		return err
 	}
 	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
@@ -527,6 +543,7 @@ func stripMarkdown(s string) string {
 	s = strings.TrimSpace(s)
 	return s
 }
+
 func (hm *HeadManager) CreateTeam(domain, model string) (*TeamManager, error) {
 	if model == "" {
 		model = hm.model
@@ -575,7 +592,7 @@ func (hm *HeadManager) CreateTeam(domain, model string) (*TeamManager, error) {
 }
 
 func (hm *HeadManager) Execute() error {
-	hm.stateMachine.Transition(PhaseExecute, "Starting execute phase")
+	hm.runtimeFlow.Transition(RuntimeExecute, "Starting execute phase")
 	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
 		Source:  "head_manager",
 		Payload: map[string]string{"phase": "execute"},
@@ -607,7 +624,7 @@ func (hm *HeadManager) Execute() error {
 }
 
 func (hm *HeadManager) Review() error {
-	hm.stateMachine.Transition(PhaseReview, "Starting review phase")
+	hm.runtimeFlow.Transition(RuntimeReview, "Starting review phase")
 	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
 		Source:  "head_manager",
 		Payload: map[string]string{"phase": "review"},
@@ -636,8 +653,6 @@ func (hm *HeadManager) Review() error {
 		}
 	}
 
-	// Task completion is reported for observability only. Software validation and
-	// repair now define build success.
 	if totalTasks == 0 {
 		pterm.Warning.Println("No agent tasks were executed")
 		hm.logDecision("review", "Review complete: no agent tasks were executed")
@@ -653,43 +668,6 @@ func (hm *HeadManager) Review() error {
 	hm.WriteTrace("phase_end", "head_manager", "review", "", "completed", "review complete")
 	pterm.Success.Printfln("Review phase complete. %d/%d tasks passed.", totalTasks-failedTasks, totalTasks)
 	return nil
-}
-
-func (hm *HeadManager) LifecyclePhase() LifecyclePhase  { return hm.lifecycleMachine.Current() }
-func (hm *HeadManager) LifecycleStr() string            { return hm.lifecycleMachine.CurrentStr() }
-func (hm *HeadManager) CostTracker() *CostTracker       { return hm.costTracker }
-func (hm *HeadManager) ReviewGates() *ReviewGateManager { return hm.reviewGates }
-func (hm *HeadManager) CanAdvanceLifecycle() bool       { return hm.reviewGates.AllRequiredPassed() }
-
-func (hm *HeadManager) AdvanceLifecycle() error {
-	if !hm.CanAdvanceLifecycle() {
-		failed := hm.reviewGates.GetFailedRequired()
-		return fmt.Errorf("cannot advance lifecycle: %d required gates not passed: %v", len(failed), failed)
-	}
-	next := hm.lifecycleMachine.Current() + 1
-	if next > LifecycleProduction {
-		return fmt.Errorf("already at final lifecycle phase")
-	}
-	approvals := []string{"head_manager"}
-	err := hm.lifecycleMachine.Transition(next, "Advancing lifecycle phase", approvals)
-	if err != nil {
-		return err
-	}
-	hm.project.LifecyclePhase = next.ToModel()
-	hm.project.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	hm.WriteTrace("lifecycle_advance", "head_manager", hm.lifecycleMachine.CurrentStr(), "", "completed",
-		fmt.Sprintf("Advanced to %s phase. Deliverable: %s", hm.lifecycleMachine.CurrentStr(), models.LifecycleDeliverable(next.ToModel())))
-	hm.bus.Publish(event.EvtPhaseChanged, event.Event{
-		Source:  "head_manager",
-		Payload: map[string]string{"phase": hm.lifecycleMachine.CurrentStr(), "type": "lifecycle"},
-	})
-	return nil
-}
-
-func (hm *HeadManager) ApproveGate(gateType GateType, approvedBy, notes string) {
-	hm.reviewGates.SetGatePassed(gateType, approvedBy, notes)
-	hm.WriteTrace("gate_approved", approvedBy, hm.lifecycleMachine.CurrentStr(), "", "approved",
-		fmt.Sprintf("Gate %s approved by %s", gateType, approvedBy))
 }
 
 func (hm *HeadManager) logDecision(action, payload string) {
@@ -712,34 +690,8 @@ func (hm *HeadManager) SendMessage(from, to, msgType, payload string) {
 	})
 }
 
-func (hm *HeadManager) RunFullPipeline() error {
-	pterm.DefaultSection.Printfln("🚀 RouterForge Pipeline Starting")
-	pterm.Println()
-
-	if err := hm.Understand(); err != nil {
-		return fmt.Errorf("understand phase failed: %w", err)
-	}
-
-	hm.SendMessage("head_manager", "all", "broadcast", fmt.Sprintf("Model selected: %s", hm.model))
-
-	if err := hm.Design(); err != nil {
-		return fmt.Errorf("design phase failed: %w", err)
-	}
-
-	hm.SendMessage("head_manager", "all_teams", "broadcast", fmt.Sprintf("Teams created. Using model: %s", hm.model))
-
-	if err := hm.Execute(); err != nil {
-		hm.logDecision("execute", fmt.Sprintf("Execute phase had errors: %v", err))
-	}
-
-	if err := hm.RepairUntilValid(2); err != nil {
-		return fmt.Errorf("repair loop failed: %w", err)
-	}
-
-	if err := hm.Review(); err != nil {
-		hm.logDecision("review", fmt.Sprintf("Review: %v", err))
-	}
-
-	pterm.DefaultSection.Printfln("✅ Pipeline Complete")
-	return nil
+// RunLifecycle runs the unified lifecycle flow via LifecycleEngine.
+// Replaces the old RunFullPipeline().
+func (hm *HeadManager) RunLifecycle() error {
+	return hm.lifecycle.Run()
 }

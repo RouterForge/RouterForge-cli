@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 )
 
-type PipelineProfile struct {
+type LifecycleProfile struct {
 	Teams      []string `json:"teams"`
 	MaxAgents  int      `json:"max_agents"`
 	AutoReview bool     `json:"auto_review"`
 }
 
-type PipelineConfig struct {
-	Teams    []string                    `json:"teams"`
-	Profile  string                      `json:"profile"`
-	Profiles map[string]*PipelineProfile `json:"profiles"`
+type LifecycleConfig struct {
+	Teams    []string                     `json:"teams"`
+	Profile  string                       `json:"profile"`
+	Profiles map[string]*LifecycleProfile `json:"profiles"`
 }
 
 type Config struct {
@@ -24,7 +24,7 @@ type Config struct {
 	SmallModel string          `json:"small_model"`
 	ProjectDir string          `json:"project_dir"`
 	DataDir    string          `json:"data_dir"`
-	Pipeline   *PipelineConfig `json:"pipeline"`
+	Lifecycle  *LifecycleConfig `json:"lifecycle"`
 }
 
 func DefaultConfig() *Config {
@@ -34,10 +34,10 @@ func DefaultConfig() *Config {
 		SmallModel: "deepseek-v4-flash-free",
 		ProjectDir: ".",
 		DataDir:    filepath.Join(home, ".routerforge"),
-		Pipeline: &PipelineConfig{
+		Lifecycle: &LifecycleConfig{
 			Teams:   []string{"backend", "frontend"},
 			Profile: "full",
-			Profiles: map[string]*PipelineProfile{
+			Profiles: map[string]*LifecycleProfile{
 				"quick": {
 					Teams:      []string{"frontend"},
 					MaxAgents:  2,

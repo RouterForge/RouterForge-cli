@@ -22,7 +22,7 @@ type Program struct {
 	teamTabMap    map[string]string
 	chatHistory   []engine.ChatMessage
 	projectReady  bool
-	pipelineLaunched bool
+	lifecycleLaunched bool
 }
 
 func NewProgram(hm *orchestrator.HeadManager) *Program {
@@ -41,10 +41,10 @@ func NewProgram(hm *orchestrator.HeadManager) *Program {
 			p.model.mu.Unlock()
 			return
 		}
-		if p.model.pipelineRunning {
+		if p.model.lifecycleRunning {
 			p.model.addLineToTab("head_manager", Line{
 				Time: time.Now().Format("15:04:05"),
-				Text: "Pipeline is already running. Please wait...",
+				Text: "Lifecycle is already running. Please wait...",
 				Type: LineInfo,
 			})
 			p.model.mu.Unlock()
@@ -121,7 +121,7 @@ func (p *Program) handleCommand(text string) {
 			"  /reload, /reset  restart the session\n" +
 			"  /cancel, /stop   cancel running pipeline\n" +
 			"  /clear           clear current tab\n\n" +
-			"  /build <desc>    start project pipeline\n" +
+			"  /build <desc>    start project lifecycle\n" +
 			"  /plan            run planning phase\n" +
 			"  /design          run design phase\n" +
 			"  /execute         run execute phase\n" +
@@ -163,20 +163,20 @@ func (p *Program) handleCommand(text string) {
 
 	case "/reload", "/reset":
 		p.chatHistory = nil
-		p.model.pipelineRunning = false
-		p.pipelineLaunched = false
+		p.model.lifecycleRunning = false
+		p.lifecycleLaunched = false
 		p.model.phase = ""
 		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Session reloaded.", Type: LinePhase})
 
 	case "/cancel", "/stop":
-		if !p.model.pipelineRunning {
-			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "No pipeline running.", Type: LineInfo})
+		if !p.model.lifecycleRunning {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "No lifecycle running.", Type: LineInfo})
 			return
 		}
-		p.model.pipelineRunning = false
-		p.pipelineLaunched = false
+		p.model.lifecycleRunning = false
+		p.lifecycleLaunched = false
 		p.model.phase = ""
-		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Pipeline cancelled.", Type: LineWarning})
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Lifecycle cancelled.", Type: LineWarning})
 
 	case "/clear":
 		p.model.tabs[p.model.activeTab].Lines = nil
@@ -184,8 +184,8 @@ func (p *Program) handleCommand(text string) {
 		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Cleared.", Type: LineInfo})
 
 	case "/build":
-		if p.model.pipelineRunning {
-			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Pipeline already running.", Type: LineInfo})
+		if p.model.lifecycleRunning {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Lifecycle already running.", Type: LineInfo})
 			return
 		}
 		desc := strings.Join(args, " ")
@@ -197,13 +197,13 @@ func (p *Program) handleCommand(text string) {
 		p.launchPipeline(desc, desc)
 		p.model.mu.Lock()
 
-	case "/plan", "/design", "/execute", "/review", "/repair", "/deploy":
+	case "/plan", "/design", "/execute", "/repair", "/review", "/deploy":
 		phase := strings.TrimPrefix(cmd, "/")
-		if p.model.pipelineRunning {
-			p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Pipeline already running. Use /cancel first."), Type: LineInfo})
+		if p.model.lifecycleRunning {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Lifecycle already running. Use /cancel first."), Type: LineInfo})
 			return
 		}
-		p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Starting %s phase... Use /build for full pipeline.", phase), Type: LinePhase})
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Starting %s phase... Use /build for full lifecycle.", phase), Type: LinePhase})
 		p.model.mu.Unlock()
 		p.launchPipeline(phase+" phase", phase+" phase")
 		p.model.mu.Lock()
@@ -236,7 +236,7 @@ func (p *Program) handleCommand(text string) {
 
 	case "/status":
 		s := "Idle"
-		if p.model.pipelineRunning {
+		if p.model.lifecycleRunning {
 			s = "Running"
 		}
 		agents := 0
@@ -383,12 +383,12 @@ func (p *Program) handleCommand(text string) {
 
 func (p *Program) launchPipeline(text string, llmResponse string) {
 	p.model.mu.Lock()
-	if p.pipelineLaunched {
+	if p.lifecycleLaunched {
 		p.model.mu.Unlock()
 		return
 	}
-	p.pipelineLaunched = true
-	p.model.pipelineRunning = true
+	p.lifecycleLaunched = true
+	p.model.lifecycleRunning = true
 
 	parts := strings.SplitN(llmResponse, "---READY---", 2)
 	summary := strings.TrimSpace(parts[len(parts)-1])
@@ -425,7 +425,7 @@ func (p *Program) launchPipeline(text string, llmResponse string) {
 		p.handleEvent(evt)
 	})
 
-	p.hm.RunFullPipeline()
+	p.hm.RunLifecycle()
 }
 
 func (p *Program) tabForID(id string) string {

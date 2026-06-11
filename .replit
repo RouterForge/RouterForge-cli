@@ -1,4 +1,5 @@
 run = "go run ."
+modules = ["nodejs-20"]
 
 [test]
 command = "go test ./..."
@@ -7,3 +8,6 @@ command = "go test ./..."
 GOFLAGS = "-mod=mod"
 GONOSUMCHECK = "*"
 GONOSUMDB = "*"
+
+[agent]
+expertMode = true

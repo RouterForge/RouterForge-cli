@@ -72,11 +72,11 @@ make build
 | `routerforge` | Launch the multi-agent OS (chat with Head Manager) |
 | `init` | Initialize a new RouterForge project |
 | `plan` | Interactive planning phase |
-| `build` | Execute the build pipeline |
+| `build` | Execute the lifecycle runtime flow |
 | `analyze` | Repository Intelligence Engine + Capability Fusion |
 | `agent` | Spawn dynamic sub-agents |
 | `serve` | Serve generated artifacts |
-| `lifecycle` | Manage development lifecycle phases |
+| `lifecycle` | Unified lifecycle: runtime flow + project maturity |
 | `gate` | Review and approve governance gates |
 | `deploy` | Deployment readiness checks |
 | `inspect` | Inspect all build artifacts |
@@ -156,10 +156,13 @@ routerforge analyze matrix
 routerforge agent spawn "code_reviewer" "Review the auth package for security issues"
 ```
 
-### Development Lifecycle
+### Unified Project Lifecycle
 
 ```bash
+# View lifecycle status (runtime flow + project maturity + review gates)
 routerforge lifecycle status
+
+# Advance to the next project maturity stage
 routerforge lifecycle advance
 ```
 
@@ -193,41 +196,49 @@ routerforge serve
 ## Architecture
 
 ```
-                    ┌──────────────────────────┐
-                    │     Semantic Code Model    │
-                    │  (Codebase — single truth) │
-                    └──────────┬───────────────┘
-                               │ feeds
-           ┌───────────────────┼───────────────────┐
-           │                   │                   │
-    ┌──────▼──────┐   ┌───────▼───────┐   ┌───────▼───────┐
-    │ Repository   │   │ Architecture  │   │  Capability    │
-    │ Intelligence │   │ Generator     │   │  Extraction    │
-    │ (Analyze)    │   │ (Plan/Design) │   │  (Fusion)      │
-    └──────┬───────┘   └───────┬───────┘   └───────┬───────┘
-           │                   │                   │
-           └───────────────────┼───────────────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │    Head Manager      │
-                    │  (Orchestrator)      │
-                    └──────────┬──────────┘
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                  │
-      ┌──────▼─────┐   ┌──────▼──────┐   ┌──────▼──────┐
-      │ Team Mgr   │   │  Team Mgr   │   │  Team Mgr   │
-      │ (Frontend) │   │  (Backend)  │   │  (Security) │
-      └──────┬─────┘   └──────┬──────┘   └──────┬──────┘
-             │                │                  │
-      ┌──────▼─────┐   ┌──────▼──────┐   ┌──────▼──────┐
-      │ MicroAgent │   │  MicroAgent │   │  MicroAgent │
-      │ Component  │   │  API        │   │  Security   │
-      │ Builder    │   │  Designer   │   │  Reviewer   │
-      └────────────┘   └─────────────┘   └─────────────┘
+                     ┌─────────────────────────────┐
+                     │    Project Lifecycle Engine    │
+                     │  ┌─────────────────────────┐  │
+                     │  │   Runtime Flow (now)      │  │
+                     │  │ Idle→Understand→Design→  │  │
+                     │  │ Execute→Repair→Review    │  │
+                     │  └────────────┬────────────┘  │
+                     │               │ syncs         │
+                     │  ┌────────────▼────────────┐  │
+                     │  │ Project Maturity (over   │  │
+                     │  │ time): Demo→Prototype→  │  │
+                     │  │ MVP→Production          │  │
+                     │  └─────────────────────────┘  │
+                     └──────────────┬──────────────┘
+                                    │ feeds
+            ┌───────────────────────┼───────────────────────┐
+            │                       │                       │
+     ┌──────▼──────┐       ┌───────▼───────┐       ┌───────▼───────┐
+     │ Repository   │       │ Architecture  │       │  Capability    │
+     │ Intelligence │       │ Generator     │       │  Extraction    │
+     │ (Analyze)    │       │ (Plan/Design) │       │  (Fusion)      │
+     └──────┬───────┘       └───────┬───────┘       └───────┬───────┘
+            │                       │                       │
+            └───────────────────────┼───────────────────────┘
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │       Head Manager           │
+                     │    (Orchestrator)            │
+                     └──────────────┬──────────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                      │
+       ┌──────▼─────┐       ┌──────▼──────┐       ┌──────▼──────┐
+       │ Team Mgr   │       │  Team Mgr   │       │  Team Mgr   │
+       │ (Frontend) │       │  (Backend)  │       │  (Security) │
+       └──────┬─────┘       └──────┬──────┘       └──────┬──────┘
+              │                    │                      │
+       ┌──────▼─────┐       ┌──────▼──────┐       ┌──────▼──────┐
+       │ MicroAgent │       │  MicroAgent │       │  MicroAgent │
+       │ Component  │       │  API        │       │  Security   │
+       │ Builder    │       │  Designer   │       │  Reviewer   │
+       └────────────┘       └─────────────┘       └─────────────┘
 ```
-
-**Pipeline**: `Idle → Understand → Design → Execute → Repair → Review`
 
 ## Features
 
@@ -248,7 +259,7 @@ routerforge serve
 - **Layer Violation Detection**: Detects layer bypass, DDD violations, circular dependencies
 - **Browser Session Management**: Pooled headless Chromium sessions
 - **Cost Tracking**: Per-model, per-agent, per-phase cost tracking
-- **Four-Phase Development Lifecycle**: Demo → Prototype → MVP → Production with gated transitions
+- **Unified Project Lifecycle**: Single lifecycle engine with two synchronized layers — Runtime Flow (Idle→Understand→Design→Execute→Repair→Review) and Project Maturity (Demo→Prototype→MVP→Production) with gated transitions
 - **Deployment & Observability**: Health check endpoints, readiness checks, production builds
 
 ## Development
