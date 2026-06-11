@@ -2,26 +2,32 @@
 
 ## [2.1.14] — 2026-06-11
 
-### Command System & LLM-Driven Intent Detection
+### 40+ Slash Commands & LLM-Driven Intent Detection
 
-#### Slash Commands (`/command`)
-- `/help` — list all available commands
-- `/build <desc>` — force start project pipeline
-- `/chat` — clear history, switch to chat mode
-- `/status` — show current state (agents, phase, tabs)
-- `/clear` — clear current tab output
-- `/research <q>` — research mode placeholder
+#### Slash Commands
+Full command system with aliases and categorized dispatch:
+
+**Help & Control**: `/help`, `/h`, `/?`, `/exit`, `/quit`, `/q`, `/reload`, `/reset`, `/cancel`, `/stop`, `/clear`
+
+**Project Pipeline**: `/build <desc>`, `/plan`, `/design`, `/execute`, `/review`, `/repair`, `/deploy`
+
+**Modes & Tools**: `/chat`, `/project`, `/research <q>`, `/learn`, `/save`, `/export`, `/inspect`, `/analyze`
+
+**Info & Monitoring**: `/status`, `/phase`, `/agents`, `/tasks`, `/cost`, `/tokens`, `/uptime`, `/version`
+
+**Model Management**: `/models`, `/model <name>`, `/provider <name>`
+
+**Navigation**: `/next`, `/n`, `/prev`, `/p`, `/tab <n>`, `/home`, `/head`, `/teamchat`, `/team`, `/activity`, `/act`, `/code`, `/stream`
 
 #### AI-Powered Intent Detection
-- Head Manager uses LLM to classify every message (chat vs project)
-- Chat messages → natural AI conversation, no pipeline
-- Project requests → LLM asks clarifying questions (tech stack, features)
-- When enough info gathered → LLM outputs `---READY---` to launch pipeline
-- No hardcoded keyword lists, pure AI-driven conversation
+- Head Manager uses LLM to classify every message (chat vs project) — no hardcoded lists
+- Casual chat → natural AI conversation, no pipeline triggered
+- Project requests → LLM asks clarifying questions (tech stack, features, requirements)
+- When enough info gathered → LLM outputs `---READY---` to launch multi-agent pipeline
 
 #### Bug Fixes
 - Fixed go.mod module path mismatch (`routerforge/routerforge` → `routerforge/cli`)
-- Removed big-pickle files that were merged into the repo
+- Removed big-pickle files merged into the repo
 - Restored `internal/storage` and `internal/llm` packages
 
 ## [2.0.84] — 2026-06-11

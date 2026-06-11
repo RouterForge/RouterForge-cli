@@ -4,7 +4,8 @@
 
 RouterForge is a multi-agent operating system that orchestrates AI agent teams to build software projects. Just type `routerforge` and start chatting with your Head Manager — it iteratively understands your idea, spawns specialist teams, and builds your project in real time.
 
-[![Go Version](https://img.shields.io/badge/go-1.24.4-blue)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.21-blue)](https://golang.org)
+[![Version](https://img.shields.io/badge/version-2.1.14-purple)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## Quick Start
@@ -53,9 +54,8 @@ That's it. Just `routerforge`. Describe your project idea, and watch as teams of
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Navigate**: `Tab/←→` switch windows, `Enter` chat, `↑↓` scroll, `0-9` jump, `h` Head Manager, `t` Team Chat, `a` Activity, `c` Code Stream, `q` quit.
-
-**Slash Commands**: Type `/help` in chat for available commands — `/build`, `/chat`, `/status`, `/clear`, `/research`.
+**Navigate**: `Tab/←→` switch windows, `Enter` chat, `↑↓` scroll, `0-9` jump, `h` Head Manager, `t` Team Chat, `a` Activity, `c` Code Stream, `q` quit.  
+**Commands**: Type `/help` for 40+ slash commands (`/build`, `/models`, `/status`, `/exit`, `/reload`, etc.).
 
 ## Installation
 
@@ -83,16 +83,18 @@ make build
 
 ### In-App Slash Commands
 
-Type these in the Head Manager chat:
+Type these in the Head Manager chat (all start with `/`):
 
-| Command | Description |
-|---------|-------------|
-| `/help` | Show available commands |
-| `/build <desc>` | Start project pipeline |
-| `/chat` | Chat mode (ask questions) |
-| `/status` | Show current state |
-| `/clear` | Clear current tab |
-| `/research <q>` | Research mode (coming soon) |
+| Category | Commands |
+|----------|----------|
+| Help | `/help`, `/?` |
+| Control | `/exit`, `/quit`, `/reload`, `/reset`, `/cancel`, `/stop`, `/clear` |
+| Build | `/build <desc>`, `/plan`, `/design`, `/execute`, `/review`, `/repair`, `/deploy` |
+| Modes | `/chat`, `/project`, `/research <q>`, `/learn` |
+| Info | `/status`, `/phase`, `/agents`, `/tasks`, `/cost`, `/tokens`, `/uptime`, `/version` |
+| Model | `/models`, `/model <name>`, `/provider <name>` |
+| Navigate | `/next`, `/prev`, `/tab <n>`, `/home`, `/teamchat`, `/activity`, `/code` |
+| Tools | `/save`, `/export`, `/inspect`, `/analyze` |
 
 ### Build Profiles
 
