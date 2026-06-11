@@ -21,3 +21,24 @@ vendor/
 
 # Generated analysis output
 fusion-deep-study.json
+
+# opencode dev config
+.opencode/
+
+# AI agent working files
+.anchored_summary.md
+
+# Generated benchmark results
+docs/results/
+
+# Local infrastructure configs
+docker-compose.yml
+docker-compose.staging.yml
+deploy/aws/
+
+# Frontend / web app code
+cypress/
+frontend/
+src/
+templates/
+migrations/
