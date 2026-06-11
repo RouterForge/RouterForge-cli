@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.1.14] — 2026-06-11
+
+### Command System & LLM-Driven Intent Detection
+
+#### Slash Commands (`/command`)
+- `/help` — list all available commands
+- `/build <desc>` — force start project pipeline
+- `/chat` — clear history, switch to chat mode
+- `/status` — show current state (agents, phase, tabs)
+- `/clear` — clear current tab output
+- `/research <q>` — research mode placeholder
+
+#### AI-Powered Intent Detection
+- Head Manager uses LLM to classify every message (chat vs project)
+- Chat messages → natural AI conversation, no pipeline
+- Project requests → LLM asks clarifying questions (tech stack, features)
+- When enough info gathered → LLM outputs `---READY---` to launch pipeline
+- No hardcoded keyword lists, pure AI-driven conversation
+
+#### Bug Fixes
+- Fixed go.mod module path mismatch (`routerforge/routerforge` → `routerforge/cli`)
+- Removed big-pickle files that were merged into the repo
+- Restored `internal/storage` and `internal/llm` packages
+
 ## [2.0.84] — 2026-06-11
 
 ### Agent-to-Agent Chat & Live Activity/Code Stream (ChatGPT Suggestions)

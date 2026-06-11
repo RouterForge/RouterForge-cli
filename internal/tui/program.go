@@ -36,6 +36,11 @@ func NewProgram(hm *orchestrator.HeadManager) *Program {
 
 	m.onFirstMessage = func(text string) {
 		p.model.mu.Lock()
+		if strings.HasPrefix(text, "/") {
+			p.handleCommand(text)
+			p.model.mu.Unlock()
+			return
+		}
 		if p.model.pipelineRunning {
 			p.model.addLineToTab("head_manager", Line{
 				Time: time.Now().Format("15:04:05"),
@@ -96,6 +101,124 @@ Your job: determine if the user wants to chat or build a project.
 	}
 
 	return p
+}
+
+func (p *Program) handleCommand(text string) {
+	parts := strings.Fields(text)
+	if len(parts) == 0 {
+		return
+	}
+	cmd := strings.ToLower(parts[0])
+	args := parts[1:]
+
+	ts := time.Now().Format("15:04:05")
+
+	switch cmd {
+	case "/help":
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Available commands:\n  /help        show this help\n  /build <desc> start a project pipeline\n  /chat        chat mode\n  /models      list available AI models\n  /status      show current state\n  /clear       clear this tab\n  /research <q> research mode (coming soon)\n  /exit        quit RouterForge\n  /reload      restart the session",
+			Type: LineInfo,
+		})
+
+	case "/build":
+		if p.model.pipelineRunning {
+			p.model.addLineToTab("head_manager", Line{
+				Time: ts,
+				Text: "Pipeline already running.",
+				Type: LineInfo,
+			})
+			return
+		}
+		desc := strings.Join(args, " ")
+		if desc == "" {
+			p.model.addLineToTab("head_manager", Line{
+				Time: ts,
+				Text: "Usage: /build <project description>\nExample: /build a REST API in Go",
+				Type: LineInfo,
+			})
+			return
+		}
+		p.model.mu.Unlock()
+		p.launchPipeline(desc, desc)
+		p.model.mu.Lock()
+
+	case "/chat":
+		p.chatHistory = nil
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Chat mode. Ask me anything about your project.",
+			Type: LineChat,
+		})
+
+	case "/models":
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: fmt.Sprintf("Current model: %s\n\nAvailable free models:\n  big-pickle, deepseek-v4-flash-free, mimo-v2.5-free, nemotron-3-super-free, nemotron-3-ultra-free\n\nUse /model <name> to switch.", p.hm.Model()),
+			Type: LineInfo,
+		})
+
+	case "/exit":
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Shutting down...",
+			Type: LineInfo,
+		})
+		p.model.quit = true
+		go func() { time.Sleep(100 * time.Millisecond); tea.Quit() }()
+
+	case "/reload":
+		p.chatHistory = nil
+		p.model.pipelineRunning = false
+		p.pipelineLaunched = false
+		p.model.phase = ""
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Session reloaded. Ready for a new project.",
+			Type: LinePhase,
+		})
+
+	case "/clear":
+		p.model.tabs[p.model.activeTab].Lines = nil
+		p.model.tabs[p.model.activeTab].Scroll = 0
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Cleared.",
+			Type: LineInfo,
+		})
+
+	case "/status":
+		status := "Idle"
+		if p.model.pipelineRunning {
+			status = "Running (pipeline)"
+		}
+		agents := 0
+		for _, t := range p.model.tabs {
+			if t.AgentType == "team" || t.AgentType == "micro" {
+				agents++
+			}
+		}
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: fmt.Sprintf("Status: %s | Agents: %d | Tabs: %d | Phase: %s",
+				status, agents, len(p.model.tabs), p.model.phase),
+			Type: LineInfo,
+		})
+
+	case "/research":
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: "Research mode coming soon. Use /build to start a project.",
+			Type: LineInfo,
+		})
+
+	default:
+		p.model.addLineToTab("head_manager", Line{
+			Time: ts,
+			Text: fmt.Sprintf("Unknown command: %s\nType /help for available commands.", cmd),
+			Type: LineWarning,
+		})
+	}
 }
 
 func (p *Program) launchPipeline(text string, llmResponse string) {

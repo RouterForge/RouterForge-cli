@@ -53,7 +53,9 @@ That's it. Just `routerforge`. Describe your project idea, and watch as teams of
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Navigate**: `Tab/←→` switch windows, `Enter` chat, `↑↓` scroll, `0-9` jump, `h` head manager, `q` quit.
+**Navigate**: `Tab/←→` switch windows, `Enter` chat, `↑↓` scroll, `0-9` jump, `h` Head Manager, `t` Team Chat, `a` Activity, `c` Code Stream, `q` quit.
+
+**Slash Commands**: Type `/help` in chat for available commands — `/build`, `/chat`, `/status`, `/clear`, `/research`.
 
 ## Installation
 
@@ -71,7 +73,6 @@ make build
 | `init` | Initialize a new RouterForge project |
 | `plan` | Interactive planning phase |
 | `build` | Execute the build pipeline |
-| `build --tui` | RouterForge 2.0 multi-agent OS interface |
 | `analyze` | Repository Intelligence Engine + Capability Fusion |
 | `agent` | Spawn dynamic sub-agents |
 | `serve` | Serve generated artifacts |
@@ -79,6 +80,19 @@ make build
 | `gate` | Review and approve governance gates |
 | `deploy` | Deployment readiness checks |
 | `inspect` | Inspect all build artifacts |
+
+### In-App Slash Commands
+
+Type these in the Head Manager chat:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/build <desc>` | Start project pipeline |
+| `/chat` | Chat mode (ask questions) |
+| `/status` | Show current state |
+| `/clear` | Clear current tab |
+| `/research <q>` | Research mode (coming soon) |
 
 ### Build Profiles
 
