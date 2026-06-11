@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.0.0] — 2026-06-11
+
+### RouterForge 2.0 — Multi-Agent OS Interface
+
+#### Conversational Entry Point
+- `routerforge` now launches the multi-agent OS directly — no flags, no subcommands needed
+- First-run auto-initializes the `.routerforge` project directory with defaults
+- Head Manager window greets the user with a chat prompt: "Tell me about the project you want to build"
+- User types their idea → pipeline starts with that description as project context
+- Old `routerforge build --tui` still works for backwards compatibility
+
+#### Multi-Window OS Interface (internal/tui/model.go — complete rewrite)
+- **Tabbed agent windows**: Head Manager + per-team tabs (Backend Team, Frontend Team, etc.)
+- **Dark OS-like theme**: Purple accents, dark borders, clean typography, sleek panels
+- **Filtered output**: Only meaningful events shown in the main view (decisions, task progress, artifacts, phase changes)
+- **Internal machinery hidden**: `tool.executed`, `model.called`, file operations — logged internally, not displayed
+- **Chat input bar**: Press `Enter` to type messages to the active agent, `Enter` to send
+- **Per-tab scrollable history**: `↑/↓/PgUp/PgDn` with auto-scroll to latest content
+- **Status bar**: Live phase, agent count, cost, tokens, uptime
+- **Keyboard hints footer**: Tab/←→ switch, Enter chat, 0-9 jump, h head manager, q quit
+- **Initial welcome lines**: Head Manager greets user with onboarding instructions
+
+#### Event Routing & Filtering (internal/tui/program.go — rewritten)
+- Maps agent IDs to team tabs for correct message routing
+- Filters out internal noise to `internalLog` — not shown in the main UI
+- New artifact-created events (`📄 Generated: main.go`) shown in agent windows
+- Tabs created dynamically when teams are spawned via pipeline events
+- `SilentUserProxy` prevents stdin conflicts between Bubble Tea and the pipeline goroutine
+
+#### Infrastructure Changes
+- **New**: `internal/agent/silent_proxy.go` — returns defaults instead of blocking on stdin
+- **New**: `event.EvtArtifactCreated` event type for tracking generated files
+- **Fixed**: `micro_agent.go` task events now use `tr.agentID` as source (was `c.Project.ID`) — enables correct tab routing
+- **Changed**: `file_sections.go` returns `[]fileResult` instead of raw count — enables artifact tracking
+- **Updated**: `repair.go` and `repair_test.go` for new `writeFileSections` API
+- **Updated**: `Makefile` with `GONOSUMCHECK`/`GONOSUMDB` bypass for nix build compatibility
+- **Updated**: `cmd/build.go` flag description: "RouterForge 2.0 multi-agent OS interface (recommended)"
+- **Updated**: `cmd/root.go` now launches TUI directly; project auto-initializes if needed
+
 ## [1.8.0] — 2026-06-10
 
 ### Added (Repair Engine — Closed Execution Loop)

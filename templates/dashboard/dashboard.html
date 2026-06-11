@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Big Pickle</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --surface: #ffffff;
+            --surface-alt: #f8fafc;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --radius: 12px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--surface-alt);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 24px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-brand {
+            padding: 0 24px 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .sidebar-brand h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .sidebar-brand span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-nav { flex: 1; padding: 0 12px; }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover { background: var(--surface-alt); color: var(--text); }
+        .nav-item.active { background: #eff6ff; color: var(--primary); }
+
+        .nav-icon { font-size: 1.2rem; width: 24px; text-align: center; }
+
+        .sidebar-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .user-details { flex: 1; }
+        .user-name { font-weight: 600; font-size: 0.9rem; }
+        .user-email { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Main Content */
+        .main { padding: 32px; overflow-y: auto; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .header h2 { font-size: 1.75rem; font-weight: 700; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .status-dot.connected { background: var(--success); animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover { background: var(--surface-alt); border-color: var(--text-muted); }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover { background: var(--primary-dark); }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-card.highlight { border-left: 4px solid var(--primary); }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .stat-change {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-change.positive { color: var(--success); }
+        .stat-change.negative { color: var(--danger); }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 { font-size: 1rem; font-weight: 600; }
+
+        .card-body { padding: 24px; }
+
+        /* Activity List */
+        .activity-list { list-style: none; }
+
+        .activity-item {
+            display: flex;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .activity-item:last-child { border-bottom: none; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .activity-icon.login { background: #dcfce7; }
+        .activity-icon.api { background: #dbeafe; }
+        .activity-icon.settings { background: #fef3c7; }
+        .activity-icon.error { background: #fee2e2; }
+
+        .activity-content { flex: 1; }
+        .activity-title { font-weight: 500; font-size: 0.9rem; }
+        .activity-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Notifications */
+        .notification-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .notification-item:last-child { border-bottom: none; }
+        .notification-item.unread { background: #f0f9ff; margin: 0 -24px; padding: 12px 24px; }
+
+        .notification-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+
+        .notification-dot.info { background: var(--info); }
+        .notification-dot.warning { background: var(--warning); }
+        .notification-dot.success { background: var(--success); }
+        .notification-dot.error { background: var(--danger); }
+
+        .notification-title { font-weight: 500; font-size: 0.85rem; }
+        .notification-text { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        .notification-time { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Storage Bar */
+        .storage-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .storage-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .storage-fill.warning { background: var(--warning); }
+        .storage-fill.danger { background: var(--danger); }
+
+        /* Real-time indicator */
+        .realtime-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .realtime-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Toast notification */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 20px;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(100px); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .content-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h1>🥒 Big Pickle</h1>
+                <span>User Dashboard</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a class="nav-item active" href="/dashboard">
+                    <span class="nav-icon">📊</span> Dashboard
+                </a>
+                <a class="nav-item" href="/profile">
+                    <span class="nav-icon">👤</span> Profile
+                </a>
+                <a class="nav-item" href="/settings">
+                    <span class="nav-icon">⚙️</span> Settings
+                </a>
+                <a class="nav-item" href="/api-keys">
+                    <span class="nav-icon">🔑</span> API Keys
+                </a>
+                <a class="nav-item" href="/logs">
+                    <span class="nav-icon">📋</span> Logs
+                </a>
+                <a class="nav-item" href="/help">
+                    <span class="nav-icon">❓</span> Help
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">
+                        {{with .User}}{{slice .Name 0 1}}{{else}}U{{end}}
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">{{with .User}}{{.Name}}{{else}}User{{end}}</div>
+                        <div class="user-email">{{with .User}}{{.Email}}{{else}}user@example.com{{end}}</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div class="header">
+                <div>
+                    <h2>Dashboard</h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Welcome back, {{with .User}}{{.Name}}{{else}}User{{end}}!</p>
+                </div>
+                <div class="header-actions">
+                    <div class="connection-status" id="connection-status">
+                        <div class="status-dot" id="status-dot"></div>
+                        <span id="status-text">Connecting...</span>
+                    </div>
+                    <button class="btn" onclick="refreshDashboard()">🔄 Refresh</button>
+                    <a href="/logout" class="btn">Sign Out</a>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card highlight" data-stat="logins">
+                    <div class="stat-label">Total Logins</div>
+                    <div class="stat-value" id="stat-logins">{{if .Stats}}{{.Stats.TotalLogins}}{{else}}0{{end}}</div>
+                    <div class="stat-change positive">↑ Active today</div>
+                </div>
+                <div class="stat-card" data-stat="api-calls">
+                    <div class="stat-label">API Calls (Today)</div>
+                    <div class="stat-value" id="stat-api-today">{{if .Stats}}{{.Stats.ApiCallsToday}}{{else}}0{{end}}</div>
+                    <div class="stat-change positive">↑ Live count</div>
+                </div>
+                <div class="stat-card" data-stat="views">
+                    <div class="stat-label">Profile Views</div>
+                    <div class="stat-value" id="stat-views">{{if .Stats}}{{.Stats.ProfileViews}}{{else}}0{{end}}</div>
+                    <div class="stat-change positive">↑ 12% this week</div>
+                </div>
+                <div class="stat-card" data-stat="sessions">
+                    <div class="stat-label">Active Sessions</div>
+                    <div class="stat-value" id="stat-sessions">{{if .Stats}}{{.Stats.ActiveSessions}}{{else}}1{{end}}</div>
+                    <div class="realtime-badge" style="margin-top: 8px;">
+                        <span class="realtime-dot"></span> Real-time
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Grid -->
+            <div class="content-grid">
+                <!-- Activity Feed -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📋 Recent Activity</h3>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="realtime-badge"><span class="realtime-dot"></span> Live</span>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        <ul class="activity-list" id="activity-list">
+                            {{range .Activities}}
+                            <li class="activity-item">
+                                <div class="activity-icon {{.Action}}">{{if eq .Action "login"}}🔑{{else if eq .Action "api"}}🔌{{else if eq .Action "settings"}}⚙️{{else}}📋{{end}}</div>
+                                <div class="activity-content">
+                                    <div class="activity-title">{{.Resource}}</div>
+                                    <div class="activity-meta">{{.Action}} from {{.IPAddress}} · {{.CreatedAt.Format "Jan 02, 15:04"}}</div>
+                                </div>
+                            </li>
+                            {{else}}
+                            <li class="activity-item" id="no-activity">
+                                <div class="activity-content" style="text-align: center; color: var(--text-muted);">
+                                    No recent activity. Actions will appear here in real-time.
+                                </div>
+                            </li>
+                            {{end}}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Notifications -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🔔 Notifications</h3>
+                            <button class="btn" style="font-size: 0.75rem; padding: 4px 10px;" onclick="markAllRead()">Mark all read</button>
+                        </div>
+                        <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                            <div id="notification-list">
+                                {{range .Notifications}}
+                                <div class="notification-item {{if not .Read}}unread{{end}}">
+                                    <div class="notification-dot {{.Type}}"></div>
+                                    <div>
+                                        <div class="notification-title">{{.Title}}</div>
+                                        <div class="notification-text">{{.Message}}</div>
+                                        <div class="notification-time">{{.CreatedAt.Format "Jan 02, 15:04"}}</div>
+                                    </div>
+                                </div>
+                                {{else}}
+                                <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.85rem;">
+                                    No notifications
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Storage Usage -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>💾 Storage Usage</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 8px;">
+                                <span id="storage-used">{{if .Stats}}{{printf "%.1f" .Stats.StorageUsedMB}}{{else}}0.0{{end}} MB</span>
+                                <span id="storage-limit" style="color: var(--text-muted);">of {{if .Stats}}{{printf "%.0f" .Stats.StorageLimitMB}}{{else}}1000{{end}} MB</span>
+                            </div>
+                            <div class="storage-bar">
+                                <div class="storage-fill" id="storage-fill" style="width: {{if .Stats}}{{printf "%.1f" (divf .Stats.StorageUsedMB .Stats.StorageLimitMB 100.0)}}{{else}}0{{end}}%"></div>
+                            </div>
+                            <div style="margin-top: 16px; font-size: 0.8rem; color: var(--text-muted);">
+                                API calls this month: <strong id="api-month">{{if .Stats}}{{.Stats.ApiCallsMonth}}{{else}}0{{end}}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Dashboard JavaScript -->
+    <script>
+    (function() {
+        'use strict';
+
+        const WS_URL = '{{.WSURL}}';
+        let ws = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT = 10;
+        const BASE_DELAY = 1000;
+
+        // ── WebSocket Connection ──────────────────────────
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = function() {
+                reconnectAttempts = 0;
+                updateConnectionStatus(true);
+                showToast('🟢 Connected to real-time updates', 'success');
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const update = JSON.parse(event.data);
+                    handleUpdate(update);
+                } catch (e) {
+                    console.error('Failed to parse update:', e);
+                }
+            };
+
+            ws.onclose = function() {
+                updateConnectionStatus(false);
+                scheduleReconnect();
+            };
+
+            ws.onerror = function(err) {
+                console.error('WebSocket error:', err);
+                ws.close();
+            };
+        }
+
+        function scheduleReconnect() {
+            if (reconnectAttempts >= MAX_RECONNECT) {
+                showToast('⚠️ Lost connection. Please refresh.', 'warning');
+                return;
+            }
+
+            const delay = Math.min(BASE_DELAY * Math.pow(2, reconnectAttempts), 30000);
+            reconnectAttempts++;
+            setTimeout(connect, delay);
+        }
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Live';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Reconnecting...';
+            }
+        }
+
+        // ── Update Handlers ───────────────────────────────
+        function handleUpdate(update) {
+            switch (update.type) {
+                case 'connected':
+                    break;
+
+                case 'stats':
+                    handleStatsUpdate(update.data);
+                    break;
+
+                case 'activity':
+                    handleActivityUpdate(update.data);
+                    break;
+
+                case 'notification':
+                    handleNotificationUpdate(update.data);
+                    break;
+
+                case 'storage':
+                    handleStorageUpdate(update.data);
+                    break;
+
+                default:
+                    console.log('Unknown update type:', update.type);
+            }
+        }
+
+        function handleStatsUpdate(data) {
+            animateValue('stat-logins', data.total_logins);
+            animateValue('stat-api-today', data.api_calls_today);
+            animateValue('stat-views', data.profile_views);
+            animateValue('stat-sessions', data.active_sessions);
+        }
+
+        function handleActivityUpdate(data) {
+            const list = document.getElementById('activity-list');
+            const noActivity = document.getElementById('no-activity');
+            if (noActivity) noActivity.remove();
+
+            const iconMap = { login: '🔑', api: '🔌', settings: '⚙️' };
+            const li = document.createElement('li');
+            li.className = 'activity-item';
+            li.innerHTML = `
+                <div class="activity-icon ${data.action}">${iconMap[data.action] || '📋'}</div>
+                <div class="activity-content">
+                    <div class="activity-title">${escapeHtml(data.resource)}</div>
+                    <div class="activity-meta">${data.action} from ${data.ip_address} · just now</div>
+                </div>
+            `;
+
+            list.insertBefore(li, list.firstChild);
+
+            // Keep list manageable
+            while (list.children.length > 20) {
+                list.removeChild(list.lastChild);
+            }
+        }
+
+        function handleNotificationUpdate(data) {
+            const container = document.getElementById('notification-list');
+            const div = document.createElement('div');
+            div.className = 'notification-item unread';
+            div.innerHTML = `
+                <div class="notification-dot ${data.type || 'info'}"></div>
+                <div>
+                    <div class="notification-title">${escapeHtml(data.title)}</div>
+                    <div class="notification-text">${escapeHtml(data.message)}</div>
+                    <div class="notification-time">just now</div>
+                </div>
+            `;
+
+            container.insertBefore(div, container.firstChild);
+            showToast(`🔔 ${data.title}`, data.type || 'info');
+        }
+
+        function handleStorageUpdate(data) {
+            const used = document.getElementById('storage-used');
+            const fill = document.getElementById('storage-fill');
+            const month = document.getElementById('api-month');
+
+            if (used) used.textContent = data.used_mb.toFixed(1) + ' MB';
+            if (month) month.textContent = data.api_calls_month;
+            if (fill) {
+                const pct = (data.used_mb / data.limit_mb) * 100;
+                fill.style.width = pct + '%';
+                fill.className = 'storage-fill' +
+                    (pct > 90 ? ' danger' : pct > 70 ? ' warning' : '');
+            }
+        }
+
+        // ── Utility Functions ─────────────────────────────
+        function animateValue(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+
+            const current = parseInt(el.textContent) || 0;
+            if (current === newValue) return;
+
+            const diff = newValue - current;
+            const steps = 20;
+            const increment = diff / steps;
+            let step = 0;
+
+            const timer = setInterval(function() {
+                step++;
+                el.textContent = Math.round(current + increment * step);
+                if (step >= steps) {
+                    el.textContent = newValue;
+                    clearInterval(timer);
+                }
+            }, 30);
+        }
+
+        function showToast(message, type) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            const colors = {
+                success: 'var(--success)',
+                warning: 'var(--warning)',
+                error: 'var(--danger)',
+                info: 'var(--info)'
+            };
+
+            toast.style.borderLeft = `3px solid ${colors[type] || colors.info}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(function() {
+                toast.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(function() {
+                    toast.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ── Public API ────────────────────────────────────
+        window.refreshDashboard = function() {
+            showToast('🔄 Refreshing...', 'info');
+            fetch('/api/dashboard/stats', {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                handleStatsUpdate(data);
+                showToast('✅ Dashboard updated', 'success');
+            })
+            .catch(function(err) {
+                showToast('❌ Refresh failed', 'error');
+            });
+        };
+
+        window.markAllRead = function() {
+            document.querySelectorAll('.notification-item.unread').forEach(function(el) {
+                el.classList.remove('unread');
+            });
+            fetch('/api/notifications/read', { method: 'POST' });
+        };
+
+        // ── Initialize ────────────────────────────────────
+        connect();
+
+        // Periodic stats refresh as fallback
+        setInterval(function() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            window.refreshDashboard();
+        }, 30000);
+    })();
+    </script>
+</body>
+</html>
