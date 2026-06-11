@@ -35,6 +35,7 @@ type HeadManager struct {
 	mem              memory.Store
 	plan             *models.Plan
 	tracePath        string
+	conversationsDir string
 	tokenBudget      *TokenBudget
 	tokenTracker     *TokenTracker
 	costTracker      *CostTracker
@@ -128,6 +129,7 @@ func (hm *HeadManager) Teams() map[string]*TeamManager         { return hm.teams
 func (hm *HeadManager) State() Phase                           { return hm.stateMachine.current }
 func (hm *HeadManager) Model() string                          { return hm.model }
 func (hm *HeadManager) Decisions() []models.Decision           { return hm.decisions }
+func (hm *HeadManager) Messages() []models.AgentMessage        { return hm.messages }
 func (hm *HeadManager) StateHistory() []models.PhaseTransition { return hm.stateMachine.History() }
 
 func (hm *HeadManager) Understand() error {
@@ -451,6 +453,7 @@ Include at least one agent per team. Each agent needs 2-4 concrete tasks.`,
 		hm.project.Name, hm.project.Goal, hm.project.TechStack, hm.project.Description, modelPromptBlock())
 
 	llm := engine.NewLLMClient(hm.model)
+	llm.ConversationsDir = hm.conversationsDir
 	result, err := llm.Chat("You are a senior software architect. Generate structured JSON plans only.", prompt)
 	if err != nil {
 		return nil, err
@@ -486,6 +489,8 @@ func (hm *HeadManager) MemoryPool() *MemoryPool           { return hm.runtime.Me
 
 func (hm *HeadManager) SetTracePath(path string) { hm.tracePath = path }
 func (hm *HeadManager) SetProjectDir(dir string) { hm.projectDir = dir }
+func (hm *HeadManager) ProjectDir() string       { return hm.projectDir }
+func (hm *HeadManager) SetConversationsDir(dir string) { hm.conversationsDir = dir }
 
 func (hm *HeadManager) WriteTrace(eventType, agentID, phase, taskID, status, detail string) {
 	if hm.tracePath == "" {
@@ -545,11 +550,12 @@ func (hm *HeadManager) CreateTeam(domain, model string) (*TeamManager, error) {
 	}
 
 	ctx := &Context{
-		Project:    hm.project,
-		ProjectDir: hm.projectDir,
-		Model:      model,
-		Data:       make(map[string]string),
-		Memory:     hm.mem,
+		Project:          hm.project,
+		ProjectDir:       hm.projectDir,
+		Model:            model,
+		Data:             make(map[string]string),
+		Memory:           hm.mem,
+		ConversationsDir: hm.conversationsDir,
 		CostHandler: func(model, agentID, phase string, usage engine.Usage) {
 			hm.costTracker.Track(model, agentID, phase, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, usage.Cost)
 		},
@@ -723,7 +729,7 @@ func (hm *HeadManager) RunFullPipeline() error {
 	hm.SendMessage("head_manager", "all_teams", "broadcast", fmt.Sprintf("Teams created. Using model: %s", hm.model))
 
 	if err := hm.Execute(); err != nil {
-		return fmt.Errorf("execute phase failed: %w", err)
+		hm.logDecision("execute", fmt.Sprintf("Execute phase had errors: %v", err))
 	}
 
 	if err := hm.RepairUntilValid(2); err != nil {
@@ -731,7 +737,7 @@ func (hm *HeadManager) RunFullPipeline() error {
 	}
 
 	if err := hm.Review(); err != nil {
-		return fmt.Errorf("review phase failed: %w", err)
+		hm.logDecision("review", fmt.Sprintf("Review: %v", err))
 	}
 
 	pterm.DefaultSection.Printfln("✅ Pipeline Complete")

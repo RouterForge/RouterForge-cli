@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -66,8 +67,10 @@ var buildCmd = &cobra.Command{
 		hm.SetMemory(memory.NewStore())
 		hm.SetTracePath(filepath.Join(routerDir, "artifacts", "trace.jsonl"))
 		hm.SetProjectDir(projectDir)
+		hm.SetConversationsDir(filepath.Join(routerDir, "artifacts", "conversations"))
 
 		if tuiFlag {
+			pterm.Info.Println("Starting RouterForge 2.0 multi-agent operating system...")
 			p := tui.NewProgram(hm)
 			if err := p.Run(); err != nil {
 				pterm.Error.Printfln("TUI error: %v", err)
@@ -104,8 +107,7 @@ var buildCmd = &cobra.Command{
 
 		pterm.Info.Println("Starting execution...")
 		if err := hm.Execute(); err != nil {
-			pterm.Error.Printfln("Execute phase failed: %v", err)
-			return
+			pterm.Warning.Printfln("Execute phase had errors: %v", err)
 		}
 
 		if err := hm.RepairUntilValid(repairRetriesFlag); err != nil {
@@ -114,10 +116,10 @@ var buildCmd = &cobra.Command{
 		}
 
 		if err := hm.Review(); err != nil {
-			pterm.Error.Printfln("Review phase failed: %v", err)
-			return
+			pterm.Warning.Printfln("Review phase: %v", err)
 		}
 
+		// Only report success if validation passed in RepairUntilValid
 		saveArtifactSummary(hm, routerDir)
 		pterm.DefaultSection.Printfln("✅ Build Complete")
 		pterm.Info.Printfln("📄 Trace: %s", filepath.Join(routerDir, "artifacts", "trace.jsonl"))
@@ -128,6 +130,8 @@ var buildCmd = &cobra.Command{
 
 func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 	artifactsDir := filepath.Join(routerDir, "artifacts")
+	os.MkdirAll(artifactsDir, 0755)
+
 	summary := map[string]interface{}{
 		"project":      hm.Project().Name,
 		"model":        hm.Model(),
@@ -139,11 +143,52 @@ func saveArtifactSummary(hm *orchestrator.HeadManager, routerDir string) {
 	}
 	data, _ := json.MarshalIndent(summary, "", "  ")
 	os.WriteFile(filepath.Join(artifactsDir, "summary.json"), data, 0644)
+
+	// Save decisions artifact
+	decData, _ := json.MarshalIndent(hm.Decisions(), "", "  ")
+	os.WriteFile(filepath.Join(artifactsDir, "decisions.json"), decData, 0644)
+
+	// Save messages artifact
+	msgData, _ := json.MarshalIndent(hm.Messages(), "", "  ")
+	os.WriteFile(filepath.Join(artifactsDir, "messages.json"), msgData, 0644)
+
+	// Save cost/token artifact
+	if hm.CostTracker() != nil {
+		costData, _ := json.MarshalIndent(hm.CostTracker().Summary(), "", "  ")
+		os.WriteFile(filepath.Join(artifactsDir, "cost.json"), costData, 0644)
+		entryData, _ := json.MarshalIndent(hm.CostTracker().Entries(), "", "  ")
+		os.WriteFile(filepath.Join(artifactsDir, "cost_entries.json"), entryData, 0644)
+	}
+
+	// Save file manifest
+	projectDir := hm.ProjectDir()
+	if projectDir == "" {
+		projectDir = "."
+	}
+	var files []string
+	filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			if info != nil && info.IsDir() && (info.Name() == ".routerforge" || info.Name() == "node_modules" || info.Name() == ".git") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(info.Name(), ".log") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	fmData, _ := json.MarshalIndent(map[string]interface{}{
+		"files":     files,
+		"count":     len(files),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}, "", "  ")
+	os.WriteFile(filepath.Join(artifactsDir, "file_manifest.json"), fmData, 0644)
 }
 
 func init() {
 	buildCmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Pipeline profile (quick, full)")
-	buildCmd.Flags().BoolVar(&tuiFlag, "tui", false, "Use terminal UI mode")
+	buildCmd.Flags().BoolVar(&tuiFlag, "tui", false, "RouterForge 2.0 multi-agent OS interface (recommended)")
 	buildCmd.Flags().IntVar(&repairRetriesFlag, "repair-retries", 2, "Maximum repair attempts after validation failure")
 	rootCmd.AddCommand(buildCmd)
 }

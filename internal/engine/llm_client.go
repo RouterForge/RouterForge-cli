@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -48,24 +50,60 @@ type LLMResponse struct {
 
 type CostCallback func(model, agentID, phase string, usage Usage)
 
+type ConversationEntry struct {
+	Timestamp    string `json:"timestamp"`
+	AgentID      string `json:"agent_id"`
+	Phase        string `json:"phase"`
+	Model        string `json:"model"`
+	SystemPrompt string `json:"system_prompt"`
+	UserPrompt   string `json:"user_prompt"`
+	Response     string `json:"response"`
+	Error        string `json:"error,omitempty"`
+}
+
 type LLMClient struct {
-	BaseURL     string
-	Model       string
-	Client      *http.Client
-	CostHandler CostCallback
-	AgentID     string
-	Phase       string
+	BaseURL        string
+	Model          string
+	Client         *http.Client
+	CostHandler    CostCallback
+	AgentID        string
+	Phase          string
+	ConversationsDir string
 }
 
 func NewLLMClient(model string) *LLMClient {
 	return &LLMClient{
 		BaseURL: "https://opencode.ai/zen/v1",
 		Model:   model,
-		Client:  &http.Client{Timeout: 120 * time.Second},
+		Client:  &http.Client{Timeout: 300 * time.Second},
 	}
 }
 
 func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
+	return c.chatWithRetry(systemPrompt, userPrompt, 2)
+}
+
+func (c *LLMClient) saveConversation(systemPrompt, userPrompt, response, errMsg string) {
+	if c.ConversationsDir == "" {
+		return
+	}
+	os.MkdirAll(c.ConversationsDir, 0755)
+	entry := ConversationEntry{
+		Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
+		AgentID:      c.AgentID,
+		Phase:        c.Phase,
+		Model:        c.Model,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
+		Response:     response,
+		Error:        errMsg,
+	}
+	data, _ := json.MarshalIndent(entry, "", "  ")
+	filename := fmt.Sprintf("conversation_%s_%s_%d.json", c.AgentID, c.Phase, time.Now().UnixNano())
+	os.WriteFile(filepath.Join(c.ConversationsDir, filename), data, 0644)
+}
+
+func (c *LLMClient) chatWithRetry(systemPrompt, userPrompt string, retries int) (string, error) {
 	req := map[string]interface{}{
 		"model": c.Model,
 		"messages": []map[string]string{
@@ -80,12 +118,17 @@ func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
+		if retries > 0 && (strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded")) {
+			return c.chatWithRetry(systemPrompt, userPrompt, retries-1)
+		}
+		c.saveConversation(systemPrompt, userPrompt, "", err.Error())
 		return "", fmt.Errorf("api call: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
+		c.saveConversation(systemPrompt, userPrompt, "", fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
 		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -103,11 +146,16 @@ func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
 		Cost string `json:"cost"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
+		c.saveConversation(systemPrompt, userPrompt, "", fmt.Sprintf("parse: %v", err))
 		return "", fmt.Errorf("parse: %w", err)
 	}
 	if len(result.Choices) == 0 {
+		c.saveConversation(systemPrompt, userPrompt, "", "no choices")
 		return "", fmt.Errorf("no choices")
 	}
+
+	response := strings.TrimSpace(result.Choices[0].Message.Content)
+	c.saveConversation(systemPrompt, userPrompt, response, "")
 
 	if c.CostHandler != nil {
 		cost := 0.0
@@ -122,7 +170,7 @@ func (c *LLMClient) Chat(systemPrompt, userPrompt string) (string, error) {
 		})
 	}
 
-	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+	return response, nil
 }
 
 func (c *LLMClient) ChatWithTools(messages []interface{}, toolDefs []interface{}) (*LLMResponse, error) {

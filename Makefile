@@ -1,25 +1,25 @@
 .PHONY: build test lint clean run
 
 BINARY=routerforge
-GO=nix-shell -p go_1_24 --run "go"
-GOBIN=/nix/store/9s1r393dnb5mygiq5f9yxy76nxpkz1gw-go-1.24.4/bin
+GO=nix-shell -p go_1_24 --command
+GOSUM=GONOSUMCHECK=* GONOSUMDB=*
 
 all: build
 
 build:
-	GOBIN=$(GOBIN) $(GOBIN)/go build -o $(BINARY) .
+	$(GO) "$(GOSUM) go build -o $(BINARY) ."
 
 test:
-	GOBIN=$(GOBIN) $(GOBIN)/go test ./... -v
+	$(GO) "$(GOSUM) go test ./... -v"
 
 lint:
-	GOBIN=$(GOBIN) $(GOBIN)/go vet ./...
+	$(GO) "$(GOSUM) go vet ./..."
 
 fmt:
-	GOBIN=$(GOBIN) $(GOBIN)/go fmt ./...
+	$(GO) "$(GOSUM) go fmt ./..."
 
 tidy:
-	GOBIN=$(GOBIN) $(GOBIN)/go mod tidy
+	$(GO) "$(GOSUM) go mod tidy"
 
 clean:
 	rm -f $(BINARY)

@@ -32,12 +32,13 @@ type AgentEvent struct {
 }
 
 type Context struct {
-	Project     *models.Project
-	ProjectDir  string
-	Model       string
-	Data        map[string]string
-	Memory      memory.Store
-	CostHandler engine.CostCallback
+	Project          *models.Project
+	ProjectDir       string
+	Model            string
+	Data             map[string]string
+	Memory           memory.Store
+	CostHandler      engine.CostCallback
+	ConversationsDir string
 }
 
 func NewMicroAgent(agent *models.Agent, ctx *Context) *MicroAgent {
@@ -190,7 +191,7 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 	statusCh <- AgentEvent{AgentID: c.Project.ID, Type: "task_started", Payload: tr.task.Description}
 	if tr.bus != nil {
 		tr.bus.Publish(event.EvtTaskStarted, event.Event{
-			Source:  c.Project.ID,
+			Source:  tr.agentID,
 			Payload: tr.task.Description,
 		})
 	}
@@ -206,6 +207,7 @@ func (tr *TaskRunner) Execute(ctx context.Context, c *Context, statusCh chan<- A
 	llm.AgentID = tr.agentID
 	llm.Phase = "execute"
 	llm.CostHandler = c.CostHandler
+	llm.ConversationsDir = c.ConversationsDir
 
 	projectDir := "."
 	if c.ProjectDir != "" {
@@ -244,7 +246,7 @@ Rules:
 		tr.task.Error = err.Error()
 		if tr.bus != nil {
 			tr.bus.Publish(event.EvtTaskFailed, event.Event{
-				Source:  c.Project.ID,
+				Source:  tr.agentID,
 				Payload: fmt.Sprintf("task %s: %s", tr.task.ID, err.Error()),
 			})
 		}
@@ -255,23 +257,32 @@ Rules:
 		return fmt.Errorf("empty response from LLM")
 	}
 
-	filesWritten, err := writeFileSections(projectDir, result)
+	files, err := writeFileSections(projectDir, result)
 	if err != nil {
 		return err
 	}
 
 	// Fallback: if no FILE: sections were parsed, write entire output as a single file
-	if filesWritten == 0 {
+	if len(files) == 0 {
 		fileName := inferFilename(tr.task.Description, c.Project.Name)
 		fullPath := filepath.Join(projectDir, fileName)
 		os.MkdirAll(filepath.Dir(fullPath), 0755)
 		if err := os.WriteFile(fullPath, []byte(result), 0644); err != nil {
 			return fmt.Errorf("write %s: %w", fileName, err)
 		}
-		filesWritten++
+		files = append(files, fileResult{path: fullPath, name: fileName})
 	}
 
-	tr.task.Result = fmt.Sprintf("Wrote %d file(s) via %s", filesWritten, c.Model)
+	if tr.bus != nil {
+		for _, f := range files {
+			tr.bus.Publish(event.EvtArtifactCreated, event.Event{
+				Source:  tr.agentID,
+				Payload: f.name,
+			})
+		}
+	}
+
+	tr.task.Result = fmt.Sprintf("Wrote %d file(s) via %s", len(files), c.Model)
 
 	if tr.mem != nil {
 		tr.mem.Add(memory.Entry{
@@ -287,7 +298,7 @@ Rules:
 	statusCh <- AgentEvent{AgentID: c.Project.ID, Type: "task_completed", Payload: tr.task.Description}
 	if tr.bus != nil {
 		tr.bus.Publish(event.EvtTaskCompleted, event.Event{
-			Source:  c.Project.ID,
+			Source:  tr.agentID,
 			Payload: tr.task.Description,
 		})
 	}

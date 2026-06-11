@@ -17,6 +17,7 @@ const (
 	EvtAgentDied      EventType = "agent.died"
 	EvtPhaseChanged   EventType = "phase.changed"
 	EvtEscalation     EventType = "escalation.raised"
+	EvtArtifactCreated EventType = "artifact.created"
 )
 
 type Event struct {

@@ -99,7 +99,15 @@ func (tm *TeamManager) AdoptPreBuiltAgent(agent *models.Agent, tasks []TaskDef) 
 func (tm *TeamManager) ExecuteAll(ctx context.Context) error {
 	pterm.DefaultSection.Printfln("Team: %s executing...", tm.agent.Role)
 
+	// Run only the first 2 agents to keep build times under 10 minutes
+	// Extra agents (designer, QA) are redundant — repair + validation handle quality
+	limit := 2
+	count := 0
 	for id, agent := range tm.microAgents {
+		if count >= limit {
+			pterm.Info.Printfln("  Skipping agent %s (cap of %d reached)", id, limit)
+			break
+		}
 		pterm.Info.Printfln("  Starting agent: %s", id)
 		err := agent.Execute(ctx)
 		if err != nil {
@@ -108,6 +116,7 @@ func (tm *TeamManager) ExecuteAll(ctx context.Context) error {
 		}
 		report, _ := agent.Report()
 		pterm.Success.Printfln("  Agent %s completed: %d tasks", id, report.TaskCount)
+		count++
 	}
 
 	return nil

@@ -111,6 +111,8 @@ func ValidateProject(projectDir string) ValidationResult {
 }
 
 func (hm *HeadManager) repairProject(result ValidationResult, attempt int) error {
+	reqChecklist := extractRequirements(hm.project.Goal)
+
 	prompt := fmt.Sprintf(`Repair this generated software project so it becomes working software.
 
 Project: %s
@@ -121,6 +123,9 @@ Detected type: %s
 Repair attempt: %d
 
 Validation result:
+%s
+
+Functional Requirements Checklist (EACH must exist in the code):
 %s
 
 Current project files:
@@ -137,12 +142,14 @@ FILE: relative/path/to/file.ext
 - Remove invalid markdown fences and separator lines from source code.
 - Prefer a minimal complete working implementation over partial architecture.
 - For a browser app, ensure index.html references existing local assets and the required UI is actually wired together.
-- For a Go app, include go.mod and code that passes go test ./....`,
-		hm.project.Name, hm.project.Goal, hm.project.TechStack, hm.project.Description, result.ProjectType, attempt, validationJSON(result), projectSnapshot(hm.projectDir))
+- For a Go app, include go.mod and code that passes go test ./....
+- Add any missing HTTP routes, API endpoints, or UI controls needed to satisfy every item in the Functional Requirements Checklist.`,
+		hm.project.Name, hm.project.Goal, hm.project.TechStack, hm.project.Description, result.ProjectType, attempt, validationJSON(result), reqChecklist, projectSnapshot(hm.projectDir))
 
 	llm := engine.NewLLMClient(hm.model)
 	llm.AgentID = "repair_engine"
 	llm.Phase = "repair"
+	llm.ConversationsDir = hm.conversationsDir
 	llm.CostHandler = func(model, agentID, phase string, usage engine.Usage) {
 		hm.costTracker.Track(model, agentID, phase, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, usage.Cost)
 	}
@@ -155,12 +162,12 @@ FILE: relative/path/to/file.ext
 	if err != nil {
 		return err
 	}
-	if files == 0 {
+	if len(files) == 0 {
 		return fmt.Errorf("repair produced no FILE sections")
 	}
-	hm.logDecision("repair", fmt.Sprintf("Repair attempt %d wrote %d file(s)", attempt, files))
-	hm.WriteTrace("repair_applied", "repair_engine", "repair", "", "completed", fmt.Sprintf("wrote %d files", files))
-	pterm.Success.Printfln("Repair attempt %d wrote %d file(s)", attempt, files)
+	hm.logDecision("repair", fmt.Sprintf("Repair attempt %d wrote %d file(s)", attempt, len(files)))
+	hm.WriteTrace("repair_applied", "repair_engine", "repair", "", "completed", fmt.Sprintf("wrote %d files", len(files)))
+	pterm.Success.Printfln("Repair attempt %d wrote %d file(s)", attempt, len(files))
 	return nil
 }
 
@@ -344,4 +351,19 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "\n... truncated ..."
+}
+
+func extractRequirements(goal string) string {
+	words := []string{"create", "edit", "update", "delete", "remove", "mark completed", "toggle", "list", "view", "search", "save", "load", "export", "import", "login", "logout", "register", "send", "receive"}
+	goalLower := strings.ToLower(goal)
+	var found []string
+	for _, w := range words {
+		if strings.Contains(goalLower, w) {
+			found = append(found, "- [ ] "+w)
+		}
+	}
+	if len(found) == 0 {
+		return "- [ ] All features described in the goal must work"
+	}
+	return strings.Join(found, "\n")
 }

@@ -7,8 +7,13 @@ import (
 	"strings"
 )
 
-func writeFileSections(projectDir, result string) (int, error) {
-	filesWritten := 0
+type fileResult struct {
+	path string
+	name string
+}
+
+func writeFileSections(projectDir, result string) ([]fileResult, error) {
+	var files []fileResult
 	sections := strings.Split(result, "FILE:")
 	for _, section := range sections {
 		section = strings.TrimSpace(section)
@@ -34,17 +39,17 @@ func writeFileSections(projectDir, result string) (int, error) {
 
 		fullPath, err := safeProjectPath(projectDir, fileName)
 		if err != nil {
-			return filesWritten, err
+			return files, err
 		}
 		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			return filesWritten, err
+			return files, err
 		}
 		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			return filesWritten, fmt.Errorf("write %s: %w", fileName, err)
+			return files, fmt.Errorf("write %s: %w", fileName, err)
 		}
-		filesWritten++
+		files = append(files, fileResult{path: fullPath, name: fileName})
 	}
-	return filesWritten, nil
+	return files, nil
 }
 
 func safeProjectPath(projectDir, fileName string) (string, error) {

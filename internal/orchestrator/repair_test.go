@@ -13,8 +13,8 @@ func TestWriteFileSectionsStripsSeparator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeFileSections: %v", err)
 	}
-	if files != 1 {
-		t.Fatalf("expected 1 file, got %d", files)
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "main.go"))
 	if err != nil {
