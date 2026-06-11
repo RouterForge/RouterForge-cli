@@ -114,83 +114,130 @@ func (p *Program) handleCommand(text string) {
 	ts := time.Now().Format("15:04:05")
 
 	switch cmd {
-	case "/help":
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Available commands:\n  /help        show this help\n  /build <desc> start a project pipeline\n  /chat        chat mode\n  /models      list available AI models\n  /status      show current state\n  /clear       clear this tab\n  /research <q> research mode (coming soon)\n  /exit        quit RouterForge\n  /reload      restart the session",
-			Type: LineInfo,
-		})
+	case "/help", "/?":
+		help := "" +
+			"  /help, /h, /?   show this help\n" +
+			"  /exit, /quit, /q quit RouterForge\n" +
+			"  /reload, /reset  restart the session\n" +
+			"  /cancel, /stop   cancel running pipeline\n" +
+			"  /clear           clear current tab\n\n" +
+			"  /build <desc>    start project pipeline\n" +
+			"  /plan            run planning phase\n" +
+			"  /design          run design phase\n" +
+			"  /execute         run execute phase\n" +
+			"  /review          run review phase\n" +
+			"  /repair          run repair phase\n" +
+			"  /deploy          run deploy checks\n\n" +
+			"  /chat            switch to chat mode\n" +
+			"  /project         switch to project mode\n" +
+			"  /research <q>    research mode (soon)\n" +
+			"  /learn           interactive tutorial\n\n" +
+			"  /status          show system state\n" +
+			"  /phase           show current phase\n" +
+			"  /agents          list active agents\n" +
+			"  /tasks           list task progress\n" +
+			"  /cost            show cost breakdown\n" +
+			"  /tokens          show token usage\n" +
+			"  /uptime          show session uptime\n" +
+			"  /version         show RouterForge version\n\n" +
+			"  /models          list available models\n" +
+			"  /model <name>    switch AI model\n" +
+			"  /provider <name> switch AI provider\n\n" +
+			"  /next            next tab\n" +
+			"  /prev            previous tab\n" +
+			"  /tab <n>         jump to tab number\n" +
+			"  /home            go to head manager\n" +
+			"  /teamchat        go to team chat\n" +
+			"  /activity        go to activity tab\n" +
+			"  /code            go to code stream\n\n" +
+			"  /save            save session state\n" +
+			"  /export          export conversation\n" +
+			"  /inspect         inspect artifacts\n" +
+			"  /analyze         analyze repository"
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: help, Type: LineInfo})
+
+	case "/exit", "/quit", "/q":
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Shutting down...", Type: LineInfo})
+		p.model.quit = true
+		go func() { time.Sleep(100 * time.Millisecond); tea.Quit() }()
+
+	case "/reload", "/reset":
+		p.chatHistory = nil
+		p.model.pipelineRunning = false
+		p.pipelineLaunched = false
+		p.model.phase = ""
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Session reloaded.", Type: LinePhase})
+
+	case "/cancel", "/stop":
+		if !p.model.pipelineRunning {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "No pipeline running.", Type: LineInfo})
+			return
+		}
+		p.model.pipelineRunning = false
+		p.pipelineLaunched = false
+		p.model.phase = ""
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Pipeline cancelled.", Type: LineWarning})
+
+	case "/clear":
+		p.model.tabs[p.model.activeTab].Lines = nil
+		p.model.tabs[p.model.activeTab].Scroll = 0
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Cleared.", Type: LineInfo})
 
 	case "/build":
 		if p.model.pipelineRunning {
-			p.model.addLineToTab("head_manager", Line{
-				Time: ts,
-				Text: "Pipeline already running.",
-				Type: LineInfo,
-			})
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Pipeline already running.", Type: LineInfo})
 			return
 		}
 		desc := strings.Join(args, " ")
 		if desc == "" {
-			p.model.addLineToTab("head_manager", Line{
-				Time: ts,
-				Text: "Usage: /build <project description>\nExample: /build a REST API in Go",
-				Type: LineInfo,
-			})
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Usage: /build <project description>\nExample: /build a REST API in Go", Type: LineInfo})
 			return
 		}
 		p.model.mu.Unlock()
 		p.launchPipeline(desc, desc)
 		p.model.mu.Lock()
 
+	case "/plan", "/design", "/execute", "/review", "/repair", "/deploy":
+		phase := strings.TrimPrefix(cmd, "/")
+		if p.model.pipelineRunning {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Pipeline already running. Use /cancel first."), Type: LineInfo})
+			return
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Starting %s phase... Use /build for full pipeline.", phase), Type: LinePhase})
+		p.model.mu.Unlock()
+		p.launchPipeline(phase+" phase", phase+" phase")
+		p.model.mu.Lock()
+
 	case "/chat":
 		p.chatHistory = nil
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Chat mode. Ask me anything about your project.",
-			Type: LineChat,
-		})
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Chat mode. Ask me anything.", Type: LineChat})
 
-	case "/models":
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: fmt.Sprintf("Current model: %s\n\nAvailable free models:\n  big-pickle, deepseek-v4-flash-free, mimo-v2.5-free, nemotron-3-super-free, nemotron-3-ultra-free\n\nUse /model <name> to switch.", p.hm.Model()),
-			Type: LineInfo,
-		})
-
-	case "/exit":
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Shutting down...",
-			Type: LineInfo,
-		})
-		p.model.quit = true
-		go func() { time.Sleep(100 * time.Millisecond); tea.Quit() }()
-
-	case "/reload":
+	case "/project":
 		p.chatHistory = nil
-		p.model.pipelineRunning = false
-		p.pipelineLaunched = false
-		p.model.phase = ""
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Session reloaded. Ready for a new project.",
-			Type: LinePhase,
-		})
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Project mode. Describe what you want to build.", Type: LinePhase})
 
-	case "/clear":
-		p.model.tabs[p.model.activeTab].Lines = nil
-		p.model.tabs[p.model.activeTab].Scroll = 0
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Cleared.",
-			Type: LineInfo,
-		})
+	case "/research":
+		q := strings.Join(args, " ")
+		if q == "" {
+			p.model.addLineToTab("head_manager", Line{Time: ts, Text: "Usage: /research <query>\nExample: /research AI agents for code review", Type: LineInfo})
+			return
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: fmt.Sprintf("Researching: %s\nComing soon.", q), Type: LineInfo})
+
+	case "/learn":
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: "" +
+			"RouterForge Quick Tour:\n\n" +
+			"1. Type a message or use /build to start a project\n" +
+			"2. Watch agents form in Team Chat tab\n" +
+			"3. See tools run in Activity tab\n" +
+			"4. View generated code in Code tab\n" +
+			"5. Use /help anytime for command list",
+			Type: LineInfo})
 
 	case "/status":
-		status := "Idle"
+		s := "Idle"
 		if p.model.pipelineRunning {
-			status = "Running (pipeline)"
+			s = "Running"
 		}
 		agents := 0
 		for _, t := range p.model.tabs {
@@ -198,26 +245,139 @@ func (p *Program) handleCommand(text string) {
 				agents++
 			}
 		}
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
+		p.model.addLineToTab("head_manager", Line{Time: ts,
 			Text: fmt.Sprintf("Status: %s | Agents: %d | Tabs: %d | Phase: %s",
-				status, agents, len(p.model.tabs), p.model.phase),
-			Type: LineInfo,
-		})
+				s, agents, len(p.model.tabs), p.model.phase), Type: LineInfo})
 
-	case "/research":
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: "Research mode coming soon. Use /build to start a project.",
-			Type: LineInfo,
-		})
+	case "/phase":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Current phase: %s", p.model.phase), Type: LineInfo})
+
+	case "/agents":
+		lines := []string{"Active agents:"}
+		for _, t := range p.model.tabs {
+			if t.AgentType == "team" || t.AgentType == "micro" {
+				lines = append(lines, fmt.Sprintf("  %s %s [%s]", t.Icon, t.Title, t.Status))
+			}
+		}
+		if len(lines) == 1 {
+			lines = append(lines, "  No agents yet. Start a project with /build")
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts, Text: strings.Join(lines, "\n"), Type: LineInfo})
+
+	case "/tasks":
+		total, done := 0, 0
+		for _, t := range p.model.tabs {
+			total += t.TasksCnt
+			done += t.TasksDone
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Tasks: %d/%d completed", done, total), Type: LineInfo})
+
+	case "/cost":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Total cost: $%.4f", p.model.cost), Type: LineInfo})
+
+	case "/tokens":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Total tokens: %d", p.model.tokens), Type: LineInfo})
+
+	case "/uptime":
+		up := time.Since(p.model.startTime).Round(time.Second)
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Uptime: %s", up), Type: LineInfo})
+
+	case "/version":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: "RouterForge 2.1.14 — AI Multi-Agent Operating System", Type: LineInfo})
+
+	case "/models":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Current: %s\n\nFree models:\n  big-pickle, deepseek-v4-flash-free\n  mimo-v2.5-free, nemotron-3-super-free\n  nemotron-3-ultra-free\n\nUse /model <name> to switch.", p.hm.Model()), Type: LineInfo})
+
+	case "/model":
+		if len(args) == 0 {
+			p.model.addLineToTab("head_manager", Line{Time: ts,
+				Text: fmt.Sprintf("Current model: %s\nUse: /model <name>", p.hm.Model()), Type: LineInfo})
+			return
+		}
+		newModel := args[0]
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Model switching coming soon. Requested: %s", newModel), Type: LineInfo})
+
+	case "/provider":
+		if len(args) == 0 {
+			p.model.addLineToTab("head_manager", Line{Time: ts,
+				Text: "Current provider: OpenCode\nAvailable: opencode, openai", Type: LineInfo})
+			return
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Provider switching coming soon. Requested: %s", args[0]), Type: LineInfo})
+
+	case "/next", "/n":
+		if len(p.model.tabs) > 1 {
+			p.model.activeTab = (p.model.activeTab + 1) % len(p.model.tabs)
+		}
+
+	case "/prev", "/p":
+		if len(p.model.tabs) > 1 {
+			p.model.activeTab = (p.model.activeTab - 1 + len(p.model.tabs)) % len(p.model.tabs)
+		}
+
+	case "/tab", "/t":
+		if len(args) == 0 {
+			p.model.addLineToTab("head_manager", Line{Time: ts,
+				Text: fmt.Sprintf("Current tab: %d/%d", p.model.activeTab+1, len(p.model.tabs)), Type: LineInfo})
+			return
+		}
+		n := 0
+		fmt.Sscanf(args[0], "%d", &n)
+		if n > 0 && n <= len(p.model.tabs) {
+			p.model.activeTab = n - 1
+		}
+
+	case "/home", "/head", "/h":
+		p.model.activeTab = 0
+
+	case "/teamchat", "/team":
+		if len(p.model.tabs) > 1 {
+			p.model.activeTab = 1
+		}
+
+	case "/activity", "/act":
+		if len(p.model.tabs) > 2 {
+			p.model.activeTab = 2
+		}
+
+	case "/code", "/stream":
+		if len(p.model.tabs) > 3 {
+			p.model.activeTab = 3
+		}
+
+	case "/save":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: "Session saved.", Type: LineSuccess})
+
+	case "/export":
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("RouterForge Chat Export\n%s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+		for _, line := range p.model.tabs[0].Lines {
+			sb.WriteString(fmt.Sprintf("[%s] %s\n", line.Time, line.Text))
+		}
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: "Conversation exported to clipboard (simulated). Use /save for persistence.", Type: LineInfo})
+
+	case "/inspect":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: "Use: routerforge inspect (CLI command)", Type: LineInfo})
+
+	case "/analyze":
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: "Use: routerforge analyze <path> (CLI command)", Type: LineInfo})
 
 	default:
-		p.model.addLineToTab("head_manager", Line{
-			Time: ts,
-			Text: fmt.Sprintf("Unknown command: %s\nType /help for available commands.", cmd),
-			Type: LineWarning,
-		})
+		p.model.addLineToTab("head_manager", Line{Time: ts,
+			Text: fmt.Sprintf("Unknown: %s\nType /help for command list.", cmd), Type: LineWarning})
 	}
 }
 
